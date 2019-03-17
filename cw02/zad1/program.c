@@ -19,9 +19,44 @@ typedef struct {
     double t_sys;
 } t_measurement;
 
-void show_errno();
+double ticks_to_seconds(clock_t t_start, clock_t t_end) {
+    return (double) (t_end - t_start) / sysconf(_SC_CLK_TCK);
+}
 
-void show_error(char *error_msg);
+void reset_measurements(t_measurement *measurement, int n) {
+    for (int i = 0; i < n; i++) {
+        measurement[i].t_real = 0;
+        measurement[i].t_sys = 0;
+        measurement[i].t_user = 0;
+    }
+}
+
+void start_measurement(t_measurement *tm) {
+    tm->real_start = times(&(tm->start));
+}
+
+void stop_measurement(t_measurement *tm) {
+    struct tms end;
+    clock_t real_end = times(&end);
+    tm->t_real += ticks_to_seconds(tm->real_start, real_end);
+    tm->t_sys += ticks_to_seconds(tm->start.tms_stime + tm->start.tms_cstime, end.tms_stime + end.tms_cstime);
+    tm->t_user += ticks_to_seconds(tm->start.tms_utime + tm->start.tms_cutime, end.tms_utime + end.tms_cutime);
+}
+
+void save_measurement(FILE *stream, t_measurement *tm) {
+    fprintf(stream, "\tREAL TIME\t%.3f\ts\n", tm->t_real);
+    fprintf(stream, "\tUSER TIME\t%.3f\ts\n", tm->t_user);
+    fprintf(stream, "\tSYS TIME\t%.3f\ts\n", tm->t_sys);
+}
+
+void show_error(char *error_msg) {
+    fprintf(stderr, "%s\n", error_msg);
+    exit(1);
+}
+
+void show_errno() {
+    show_error(strerror(errno));
+}
 
 void generate_records(char *file_path, unsigned int no_records, unsigned int record_length) {
     FILE *records_file = fopen(file_path, "w");
@@ -138,7 +173,7 @@ void sort_records_lib(char *file_path, unsigned int no_records, unsigned int rec
 void copy_records_sys(char *file_path, char *copy_path, unsigned int no_records, unsigned int record_length) {
     mode_t mode = S_IWUSR | S_IRUSR | S_IWGRP | S_IRGRP | S_IWOTH | S_IROTH;
     int records_fd = open(file_path, O_RDONLY);
-    int copy_fd = open(copy_path, mode);
+    int copy_fd = open(copy_path, O_WRONLY | O_CREAT, mode);
     if (records_fd < 0 || copy_fd < 0)
         show_error("Error while opening files before copying");
 
@@ -176,6 +211,9 @@ void copy_records_lib(char *file_path, char *copy_path, unsigned int no_records,
 }
 
 int main(int argc, char *argv[]) {
+
+    t_measurement measurement;
+
     for (int arg_index = 1; arg_index < argc; arg_index++) {
         if (strcmp("generate", argv[arg_index]) == 0) {
             char *file_path = argv[++arg_index];
@@ -189,9 +227,15 @@ int main(int argc, char *argv[]) {
             unsigned int record_length = (unsigned int) atoi(argv[++arg_index]);
             char *type = argv[++arg_index];
 
-            if (strcmp("sys", type) == 0) sort_records_sys(file_path, no_records, record_length);
-            else if (strcmp("lib", type) == 0) sort_records_lib(file_path, no_records, record_length);
-            else show_error("Unknown type of operation!");
+            if (strcmp("sys", type) == 0) {
+                start_measurement(&measurement);
+                sort_records_sys(file_path, no_records, record_length);
+                stop_measurement(&measurement);
+            } else if (strcmp("lib", type) == 0) {
+                start_measurement(&measurement);
+                sort_records_lib(file_path, no_records, record_length);
+                stop_measurement(&measurement);
+            } else show_error("Unknown type of operation!");
 
         } else if (strcmp("copy", argv[arg_index]) == 0) {
             char *file_path = argv[++arg_index];
@@ -200,20 +244,19 @@ int main(int argc, char *argv[]) {
             unsigned int record_length = (unsigned int) atoi(argv[++arg_index]);
             char *type = argv[++arg_index];
 
-            if (strcmp("sys", type) == 0) copy_records_sys(file_path, copy_path, no_records, record_length);
-            else if (strcmp("lib", type) == 0) copy_records_lib(file_path, copy_path, no_records, record_length);
-            else show_error("Unknown type of operation!");
+            if (strcmp("sys", type) == 0) {
+                start_measurement(&measurement);
+                copy_records_sys(file_path, copy_path, no_records, record_length);
+                stop_measurement(&measurement);
+            } else if (strcmp("lib", type) == 0) {
+                start_measurement(&measurement);
+                copy_records_lib(file_path, copy_path, no_records, record_length);
+                stop_measurement(&measurement);
+            } else show_error("Unknown type of operation!");
 
         } else show_error("Unknown command!");
+
+        save_measurement(stdout, &measurement);
     }
     return 0;
-}
-
-void show_errno() {
-    show_error(strerror(errno));
-}
-
-void show_error(char *error_msg) {
-    fprintf(stderr, "%s\n", error_msg);
-    exit(1);
 }

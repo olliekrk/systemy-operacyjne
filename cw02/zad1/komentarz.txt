@@ -1,0 +1,15 @@
+1. Sortowanie odbywa się w czasie n^2 stąd trwa ono znacznie dłużej niż kopiowanie, które odbywa się w czasie liniowym.
+
+2. Kopiowanie działa znacznie szybciej od sortowania, trwa ono 0 - 0.1 sekundy, nawet dla najcięższych danych.
+
+3. Sortowanie zajmuje najwięcej czasu, aż do 61.3 sekundy.
+
+4. Funkcje biblioteczne znacznie lepiej sprawdzają się przy sortowaniu rekordów o mniejszej długości.
+Dla 3000 rekordów zaczynają wypadać gorzej dopiero przy sortowaniu rekordów o długości 4096 bajtów.
+Podobnie przy 6000 rekordach wypadają gorzej od momentu sortowania rekordów o długości 4096 bajtów.
+
+5. Maksymalne czasy osiągane w trakcie operowania na 6000 rekordach o długości 8196 bajtów to:
+0.5 sek dla kopiowania funkcjami systemowymi
+0.9 sek dla kopiowania funkcjami bibliotecznymi
+42.2 sek dla sortowania funkcjami systemowymi
+61.3 sek dla sortowania funkcjami bibliotecznymi
