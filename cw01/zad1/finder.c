@@ -7,10 +7,6 @@
 
 #include "finder.h"
 
-/* TODO
-    gdyby dostęp do zmiennej globalnej nie działał zrefactoryzować, aby
-    configure_environment zwracało structa, a inne funkcje na nim operowały */
-
 struct finder_properties *environment;
 
 void set_directory(char *directory_path_arg) {
