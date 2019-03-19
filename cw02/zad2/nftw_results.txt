@@ -1,0 +1,6 @@
+/home/olliekrk/SysopyProjects/KrolikOlgierd/cw02/zad1                                               	dir       	4096      	19-03-2019 19:39:11 	19-03-2019 19:39:11 
+/home/olliekrk/SysopyProjects/KrolikOlgierd/cw02/zad1/komentarz.txt                                 	file      	911       	17-03-2019 22:08:23 	17-03-2019 22:08:22 
+/home/olliekrk/SysopyProjects/KrolikOlgierd/cw02/zad1/Makefile                                      	file      	264       	19-03-2019 19:39:11 	19-03-2019 19:33:00 
+/home/olliekrk/SysopyProjects/KrolikOlgierd/cw02/zad1/program.c                                     	file      	9553      	19-03-2019 19:32:11 	17-03-2019 21:53:46 
+/home/olliekrk/SysopyProjects/KrolikOlgierd/cw02/zad1/tests.sh                                      	file      	981       	19-03-2019 19:32:11 	17-03-2019 21:50:40 
+/home/olliekrk/SysopyProjects/KrolikOlgierd/cw02/zad1/wyniki.txt                                    	file      	6591      	19-03-2019 19:39:11 	19-03-2019 19:39:02 

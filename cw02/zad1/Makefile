@@ -1,7 +1,7 @@
 CC=gcc
 CFLAGS=-Wall
 
-all: clean static_build test
+all: clean static_build test clean
 
 static_build:
 	$(CC) $(CFLAGS) -c program.c -o program.o
@@ -12,4 +12,4 @@ test: tests.sh
 
 clean:
 	rm -f program.o program
-	rm -f records*
+	rm -f records records_copy_lib records_copy_sys
