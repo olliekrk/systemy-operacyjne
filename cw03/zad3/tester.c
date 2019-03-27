@@ -31,7 +31,6 @@ int main(int argc, char **argv) {
     char *time_stamp = malloc(FORMAT_SIZE + 1);
     if (!random_chars || !time_stamp) show_error("Error while allocating memory");
 
-
     int time_elapsed = 0;
     while (time_elapsed < max_runtime) {
         int freq = rand() % ((pmax - pmin) + 1) + pmin;

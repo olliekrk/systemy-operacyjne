@@ -8,6 +8,7 @@
 #include <memory.h>
 #include <time.h>
 #include <sys/wait.h>
+#include <sys/resource.h>
 #include <dirent.h>
 #include <errno.h>
 
@@ -17,6 +18,7 @@
 
 #define ARCHIVE_MODE 0
 #define EXEC_MODE 1
+#define MB_TO_BYTES_SHIFT 20
 
 #define ARGS_REQUIRED 4
 
@@ -26,13 +28,13 @@ void show_errno();
 
 char *read_file_content(char *f_name);
 
-int make_monitor(char *f_name, int time_interval, int total_time, int mode);
+int make_monitor(char *f_name, int time_interval, int total_time, int mode, rlim_t cpu, rlim_t mem);
 
 void archive_copy(char *f_name, int time_interval, int total_time);
 
 void exec_copy(char *f_name, int time_interval, int total_time);
 
-void monitoring(char *list, int time, int mode);
+void monitoring(char *list, int time, int mode, rlim_t cpu, rlim_t mem);
 
 void print_raport(int children);
 
@@ -42,12 +44,14 @@ int main(int argc, char **argv) {
     char *list = argv[1];
     int total_time = atoi(argv[2]);
     char *mode_name = argv[3];
+    rlim_t cpu = atoi(argv[4]);
+    rlim_t mem = atoi(argv[5]) << MB_TO_BYTES_SHIFT;
 
     int mode = -1;
     if (strcmp(mode_name, "a") == 0) mode = ARCHIVE_MODE;
     else if (strcmp(mode_name, "e") == 0) mode = EXEC_MODE;
 
-    monitoring(list, total_time, mode);
+    monitoring(list, total_time, mode, cpu, mem);
 
     return 0;
 }
@@ -73,7 +77,7 @@ char *read_file_content(char *f_name) {
 
     if (fread(file_content, (size_t) buffer->st_size, 1, file) != 1) show_error("Error while reading file");
 
-    // we need to add end-of-line manually
+    // we need to add EOF manually
     file_content[buffer->st_size] = '\0';
 
     fclose(file);
@@ -81,7 +85,7 @@ char *read_file_content(char *f_name) {
     return file_content;
 }
 
-int make_monitor(char *f_name, int time_interval, int total_time, int mode) {
+int make_monitor(char *f_name, int time_interval, int total_time, int mode, rlim_t cpu, rlim_t mem) {
     pid_t child_pid = fork();
 
     if (child_pid < 0)
@@ -89,6 +93,16 @@ int make_monitor(char *f_name, int time_interval, int total_time, int mode) {
 
     if (child_pid == 0) {
         // inside child
+
+        struct rlimit cpu_limit, mem_limit;
+        cpu_limit.rlim_cur = cpu_limit.rlim_max = cpu;
+        mem_limit.rlim_cur = mem_limit.rlim_max = mem;
+
+        if (setrlimit(RLIMIT_CPU, &cpu_limit) || setrlimit(RLIMIT_AS, &mem_limit) ||
+            getrlimit(RLIMIT_CPU, &cpu_limit) || getrlimit(RLIMIT_AS, &mem_limit)) {
+            show_errno();
+        }
+
         switch (mode) {
             case ARCHIVE_MODE:
                 archive_copy(f_name, time_interval, total_time);
@@ -233,7 +247,7 @@ void exec_copy(char *f_name, int time_interval, int total_time) {
     exit(no_copies);
 }
 
-void monitoring(char *list, int time, int mode) {
+void monitoring(char *list, int time, int mode, rlim_t cpu, rlim_t mem) {
     char *list_content = read_file_content(list);
     if (!list_content) show_error("Failed to load list content");
 
@@ -249,7 +263,7 @@ void monitoring(char *list, int time, int mode) {
         if (next_line) next_line[0] = '\0';
 
         if (sscanf(line, "%255s %d", f_name, &time_interval) == 2) {
-            no_children += make_monitor(f_name, time_interval, time, mode);
+            no_children += make_monitor(f_name, time_interval, time, mode, cpu, mem);
         } else {
             fprintf(stderr, "Invalid line: %s, incorrect format", line);
         }
@@ -269,6 +283,9 @@ void monitoring(char *list, int time, int mode) {
 
 void print_raport(int no_children) {
     for (int i = 0; i < no_children; i++) {
+        struct rusage start_rusage;
+        if (getrusage(RUSAGE_CHILDREN, &start_rusage)) show_errno();
+
         int exit_status;
         pid_t finished_pid = wait(&exit_status);
 
@@ -277,5 +294,16 @@ void print_raport(int no_children) {
             printf("Process of PID: %d has made %d back-up copies\n", (int) finished_pid, WEXITSTATUS(exit_status));
         else
             printf("Process of PID: %d has made unknown number of back-up copies\n", (int) finished_pid);
+
+        struct rusage stop_rusage;
+        if (getrusage(RUSAGE_CHILDREN, &stop_rusage)) show_errno();
+
+        printf("USER:\t%ld.%08lds\n",
+               stop_rusage.ru_utime.tv_sec - start_rusage.ru_utime.tv_sec,
+               stop_rusage.ru_utime.tv_usec - start_rusage.ru_utime.tv_usec);
+        printf("SYS:\t%ld.%08lds\n",
+               stop_rusage.ru_stime.tv_sec - start_rusage.ru_stime.tv_sec,
+               stop_rusage.ru_stime.tv_usec - start_rusage.ru_stime.tv_usec);
+
     }
 }
