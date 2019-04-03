@@ -37,7 +37,7 @@ int main(int argc, char **argv) {
         show_error("Unknown mode");
     }
 
-    printf("Catcher stated with PID: %d\n", getpid());
+    printf("catcher>\n\tpid: %d\n", getpid());
     while (1) pause();
 }
 

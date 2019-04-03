@@ -32,25 +32,16 @@ int main(int argc, char **argv) {
 
     if (strcmp(mode, "KILL") == 0) {
         modify_SIGUSR_behaviour(receive_KILL);
-        for (int i = 0; i < total_no_signals; i++) {
-            kill(catcher_pid, SIGUSR1);
-        }
-        kill(catcher_pid, SIGUSR2);
+        kill(catcher_pid, SIGUSR1);
 
     } else if (strcmp(mode, "SIGQUEUE") == 0) {
         modify_SIGUSR_behaviour(receive_SIGQUEUE);
-        for (int i = 0; i < total_no_signals; i++) {
-            union sigval ith_signal = {i};
-            sigqueue(catcher_pid, SIGUSR1, ith_signal);
-        }
-        kill(catcher_pid, SIGUSR2);
+        union sigval delivered_signal = {0};
+        sigqueue(catcher_pid, SIGUSR1, delivered_signal);
 
     } else if (strcmp(mode, "SIGRT") == 0) {
         modify_SIGRT_behaviour(receive_SIGRT);
-        for (int i = 0; i < total_no_signals; i++) {
-            kill(catcher_pid, SIGRTMIN);
-        }
-        kill(catcher_pid, SIGRTMAX);
+        kill(catcher_pid, SIGRTMIN);
 
     } else {
         show_error("Unknown mode");
@@ -63,6 +54,11 @@ static void receive_KILL(int sig, siginfo_t *info, void *context) {
     switch (sig) {
         case SIGUSR1:
             actual_no_signals++;
+            printf("sender>\n\treceived %d confirmation\n\tsending signal\n", actual_no_signals);
+            if (actual_no_signals < total_no_signals)
+                kill(info->si_pid, SIGUSR1);
+            else
+                kill(info->si_pid, SIGUSR2);
             break;
         case SIGUSR2:
             printf("sender>\n\tsent: %d\n\treceived: %d\n", total_no_signals, actual_no_signals);
@@ -75,7 +71,13 @@ static void receive_SIGQUEUE(int sig, siginfo_t *info, void *context) {
     switch (sig) {
         case SIGUSR1:
             actual_no_signals++;
-            printf("sender>\n\tconfirmed signal no. %d\n", info->si_value.sival_int);
+            printf("sender>\n\treceived %d confirmation\n\tsending signal\n", info->si_value.sival_int);
+            if (actual_no_signals < total_no_signals) {
+                union sigval delivered_signal = {actual_no_signals};
+                sigqueue(info->si_pid, SIGUSR1, delivered_signal);
+            } else {
+                kill(info->si_pid, SIGUSR2);
+            }
             break;
         case SIGUSR2:
             printf("sender>\n\tsent: %d\n\treceived: %d\n", total_no_signals, actual_no_signals);
@@ -87,6 +89,12 @@ static void receive_SIGQUEUE(int sig, siginfo_t *info, void *context) {
 static void receive_SIGRT(int sig, siginfo_t *info, void *context) {
     if (sig == SIGRTMIN) {
         actual_no_signals++;
+        printf("sender>\n\treceived %d confirmation\n\tsending signal\n", actual_no_signals);
+        if (actual_no_signals < total_no_signals) {
+            kill(info->si_pid, SIGRTMIN);
+        } else {
+            kill(info->si_pid, SIGRTMAX);
+        }
     } else if (sig == SIGRTMAX) {
         printf("sender>\n\tsent: %d\n\treceived: %d\n", total_no_signals, actual_no_signals);
         exit(0);
