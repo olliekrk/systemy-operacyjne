@@ -21,8 +21,8 @@
 
 #define ARGS_REQUIRED 2
 
-int end_active = 0;
-int received_stop_active = 0;
+int local_end_active = 0;
+int local_stop_active = 0;
 
 typedef struct {
     char *f_name;
@@ -90,7 +90,7 @@ int main(int argc, char **argv) {
     children_set *childrenSet = activate_monitoring(list);
     list_request(childrenSet);
 
-    while (!end_active) {
+    while (!local_end_active) {
         int pid;
         printf("Waiting for input:\n");
         char *next_request = calloc(MAX_INPUT_LENGTH, sizeof(char));
@@ -108,7 +108,7 @@ int main(int argc, char **argv) {
         } else if (strncmp(next_request, "START ", 6) == 0) {
             pid = atoi(next_request + 6);
             start_one_request(childrenSet, pid);
-        } else if (end_active || strcmp(next_request, "END\n") == 0) {
+        } else if (local_end_active || strcmp(next_request, "END\n") == 0) {
             end_request(childrenSet);
         } else {
             fprintf(stderr, "Invalid input command: %s\n", next_request);
@@ -193,16 +193,16 @@ void end_request(children_set *childrenSet) {
 
 static void receive_SIGINT(int sig) {
     if (sig == SIGINT)
-        end_active = 1;
+        local_end_active = 1;
 }
 
 static void receive_SIGUSR(int sig) {
     switch (sig) {
         case SIGUSR1:
-            received_stop_active = !received_stop_active;
+            local_stop_active = !local_stop_active;
             break;
         case SIGUSR2:
-            end_active = 1;
+            local_end_active = 1;
             break;
         default:
             show_error("Invalid signal received");
@@ -338,8 +338,8 @@ void archive_copy(char *f_name, int time_interval) {
     while (1) {
         sleep((unsigned int) time_interval);
 
-        if (end_active) break;
-        if (received_stop_active) continue;
+        if (local_end_active) break;
+        if (local_stop_active) continue;
 
         // creating back-up copy
         if (buffer.st_mtime > time_of_modification) {
