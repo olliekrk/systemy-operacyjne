@@ -142,7 +142,6 @@ void execute_command_line(command_line cmd_line) {
         pipe(B);
         pid_t child = fork();
         if (child == 0) {
-
             close(B[0]);
 
             if (i != 0)
