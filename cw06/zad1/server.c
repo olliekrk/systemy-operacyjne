@@ -176,7 +176,7 @@ void execute_stop(struct q_message *msg) {
 
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (clients[i].queue_id != -1) {
-            send_message(i, STOP, NULL);
+            send_message(i, STOP, "");
             kill(clients[i].pid, SIGUSR1);
         }
     }
