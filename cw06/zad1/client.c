@@ -26,10 +26,8 @@ void send_message(enum q_type type, char message[MESSAGE_LENGTH]) {
 }
 
 void receive_message(struct q_message *msg) {
-    printf("Awaiting for server's response\n");
     if (msgrcv(client_queue_id, msg, MSIZE, -(NUMBER_OF_COMMANDS), 0) == -1)
         show_error("Error while receiving response from the server");
-    printf("Received response!\n");
 }
 
 // other
@@ -66,26 +64,20 @@ void execute_init() {
     if (msgsnd(server_queue_id, &msg, MSIZE, 0) == -1)
         show_error("Error while sending message with INIT");
 
-    receive_message(&msg);
-    if (msg.mtype != INIT)
-        show_error("Invalid server response received");
-
-    sscanf(msg.message, "%d", &client_id);
+    raise(SIGUSR1);
 }
 
 void execute_stop() {
     printf("Executing STOP command.\n");
     send_message(STOP, "");
     running = false;
+    exit(3);
 }
 
 void execute_list() {
     printf("Executing LIST command.\n");
     send_message(LIST, "");
-    struct q_message msg;
-    receive_message(&msg);
-    if (msg.mtype != LIST) show_error("Invalid response type from the server");
-    printf("%s\n", msg.message);
+    raise(SIGUSR1);
 }
 
 void execute_read(char argv[COMMAND_LENGTH]) {
@@ -107,11 +99,8 @@ void execute_echo(char argv[COMMAND_LENGTH]) {
     if (extract_command_argument(argv, message) == -1) return;
 
     send_message(ECHO, message);
-    struct q_message msg;
-    receive_message(&msg);
-    if (msg.mtype != ECHO)
-        show_error("Invalid response type from the server");
-    printf("%s\n", msg.message);
+    raise(SIGUSR1);
+
 }
 
 void execute_friends(char argv[COMMAND_LENGTH]) {
@@ -143,7 +132,10 @@ void execute_del(char argv[COMMAND_LENGTH]) {
 void execute_2all(char argv[COMMAND_LENGTH]) {
     printf("Executing 2ALL command.\n");
     char message[MESSAGE_LENGTH];
-    if (extract_command_argument(argv, message) == -1) return;
+    if (extract_command_argument(argv, message) == -1) {
+        printf("Failed\n");
+        return;
+    }
     send_message(_2ALL, message);
 }
 
@@ -175,23 +167,32 @@ void SIGINT_handler(int sig) {
 }
 
 void SIGUSR_handler(int sig) {
-    //after server put message to client's queue to be read
-    //it notifies the client by sending SIGUSR1 to read the message
+    // mechanism alternative to notifications: informs the client to read the message from the queue
     struct q_message msg;
     receive_message(&msg);
+
     switch (msg.mtype) {
+        case INIT:
+            sscanf(msg.message, "%d", &client_id);
+            break;
+        case LIST:
+            printf("%s\n", msg.message);
+            break;
+        case ECHO:
+            printf("[ECHO]:%s\n", msg.message);
+            break;
         case _2ONE:
-            printf("[PRIVATE]:\t%s", msg.message);
+            printf("[PRIVATE]: %s", msg.message);
             break;
         case _2FRIENDS:
-            printf("[FRIENDS]:\t%s", msg.message);
+            printf("[FRIENDS]: %s", msg.message);
             break;
         case _2ALL:
-            printf("[ALL]:\t%s", msg.message);
+            printf("[ALL]: %s", msg.message);
             break;
         case STOP:
-            execute_stop();
-            break;
+            printf("Executing global STOP command.\n");
+            exit(3);
     }
 }
 
@@ -207,30 +208,29 @@ int process_command(FILE *file) {
     if (argc == EOF || argc == 0)
         return 0;
 
-    if (strcmp(command, "ECHO") == 0) {
+    if (strcmp(command, "ECHO") == 0)
         execute_echo(argv);
-    } else if (strcmp(command, "LIST") == 0) {
+    else if (strcmp(command, "LIST") == 0)
         execute_list();
-    } else if (strcmp(command, "FRIENDS") == 0) {
+    else if (strcmp(command, "FRIENDS") == 0)
         execute_friends(argv);
-    } else if (strcmp(command, "2ALL") == 0) {
+    else if (strcmp(command, "2ALL") == 0)
         execute_2all(argv);
-    } else if (strcmp(command, "2FRIENDS") == 0) {
+    else if (strcmp(command, "2FRIENDS") == 0)
         execute_2friends(argv);
-    } else if (strcmp(command, "2ONE") == 0) {
+    else if (strcmp(command, "2ONE") == 0)
         execute_2one(argv);
-    } else if (strcmp(command, "STOP") == 0) {
+    else if (strcmp(command, "READ") == 0)
+        execute_read(argv);
+    else if (strcmp(command, "ADD") == 0)
+        execute_add(argv);
+    else if (strcmp(command, "DEL") == 0)
+        execute_del(argv);
+    else if (strcmp(command, "STOP") == 0) {
         execute_stop();
         return EOF;
-    } else if (strcmp(command, "READ") == 0) {
-        execute_read(argv);
-    } else if (strcmp(command, "ADD") == 0) {
-        execute_add(argv);
-    } else if (strcmp(command, "DEL") == 0) {
-        execute_del(argv);
-    } else {
+    } else
         printf("Invalid command\n");
-    }
 
     return 0;
 }
@@ -253,5 +253,5 @@ int main() {
         process_command(fdopen(STDIN_FILENO, "r"));
     }
 
-    exit(0);
+    exit(3);
 }

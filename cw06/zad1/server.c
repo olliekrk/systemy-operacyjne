@@ -9,6 +9,7 @@
 #include <string.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <time.h>
 
 #include "utils6.h"
 
@@ -52,6 +53,14 @@ void initialize_server() {
     printf("Accessed server's queue with key: %d\n", server_queue_id);
 }
 
+void prepare_date_response(pid_t client_id, char *message, char *response) {
+    time_t rawtime;
+    struct tm *timeinfo;
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+    sprintf(response, "%s\t%d\t%s\n", message, client_id, asctime(timeinfo));
+}
+
 // messaging
 
 int send_message(int client_id, enum q_type type, char message[MESSAGE_LENGTH]) {
@@ -74,8 +83,7 @@ int send_message(int client_id, enum q_type type, char message[MESSAGE_LENGTH]) 
 }
 
 void add_friends(pid_t client_id, char friends_list[MESSAGE_LENGTH]) {
-    char *friend = strtok(friends_list, (const char *) FRIENDS_DELIMITER);
-
+    char *friend = strtok(friends_list, FRIENDS_DELIMITER);
     while (friend != NULL && clients[client_id].no_friends < MAX_FRIENDS) {
         int friend_id = (int) strtol(friend, NULL, 10);
 
@@ -91,7 +99,7 @@ void add_friends(pid_t client_id, char friends_list[MESSAGE_LENGTH]) {
             clients[client_id].no_friends++;
         }
 
-        friend = strtok(NULL, (const char *) FRIENDS_DELIMITER);
+        friend = strtok(NULL, FRIENDS_DELIMITER);
     }
 }
 
@@ -119,13 +127,15 @@ void execute_stop(struct q_message *msg) {
 
 void execute_list(struct q_message *msg) {
     printf("Executing LIST for client: %d\n", msg->client_id);
+    char list[MESSAGE_LENGTH] = "";
     char buffer[MESSAGE_LENGTH];
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (clients[i].queue_id >= 0) {
             sprintf(buffer, "Client's ID: %d\tClient Queue's ID:%d\n", i, clients[i].queue_id);
+            strcat(list, buffer);
         }
     }
-    send_message(msg->client_id, LIST, buffer);
+    send_message(msg->client_id, LIST, list);
 }
 
 void execute_init(struct q_message *msg) {
@@ -154,15 +164,9 @@ void execute_init(struct q_message *msg) {
 
 void execute_echo(struct q_message *msg) {
     printf("Executing ECHO for client: %d\n", msg->client_id);
-    char response_message[MESSAGE_LENGTH];
-    char datetime[31];
-
-    FILE *date = popen("date", "r");
-    fread(datetime, sizeof(char), 31, date);
-    pclose(date);
-
-    sprintf(response_message, "%s %s", msg->message, datetime);
-    send_message(msg->client_id, ECHO, response_message);
+    char response[MESSAGE_LENGTH];
+    prepare_date_response(msg->client_id, msg->message, response);
+    send_message(msg->client_id, ECHO, response);
 }
 
 void execute_friends(struct q_message *msg) {
@@ -218,7 +222,7 @@ void execute_del(struct q_message *msg) {
     int friend_id;
 
     if (n == 1) {
-        friend = strtok(friends_list, (const char *) FRIENDS_DELIMITER);
+        friend = strtok(friends_list, FRIENDS_DELIMITER);
         while (friend != NULL && (*no_friends) > 0) {
             friend_id = strtol(friend, NULL, 10);
 
@@ -238,33 +242,25 @@ void execute_del(struct q_message *msg) {
                 (*no_friends)--;
             }
 
-            friend = strtok(NULL, (const char *) FRIENDS_DELIMITER);
+            friend = strtok(NULL, FRIENDS_DELIMITER);
         }
     }
 }
 
-void prepare_date_response(pid_t client_id, char *message, char *response) {
-    char datetime[31];
-
-    FILE *date = popen("date", "r");
-    fread(datetime, sizeof(char), 31, date);
-    pclose(date);
-
-    sprintf(response, "%s\t%d\t%s\n", message, client_id, datetime);
-}
-
 void execute_2all(struct q_message *msg) {
+    printf("Executing 2ALL for client: %d\n", msg->client_id);
     char response[MESSAGE_LENGTH];
     prepare_date_response(msg->client_id, msg->message, response);
 
     for (int i = 0; i < MAX_CLIENTS; i++)
-        if (i != msg->client_id && clients[i].queue_id != -1) {
+        if (clients[i].queue_id != -1) {
             send_message(i, _2ALL, response);
             kill(clients[i].pid, SIGUSR1);
         }
 }
 
 void execute_2friends(struct q_message *msg) {
+    printf("Executing 2FRIENDS for client: %d\n", msg->client_id);
     char response[MESSAGE_LENGTH];
     prepare_date_response(msg->client_id, msg->message, response);
 
@@ -278,11 +274,12 @@ void execute_2friends(struct q_message *msg) {
 }
 
 void execute_2one(struct q_message *msg) {
+    printf("Executing 2ONE for client: %d\n", msg->client_id);
     int receiver;
     char text[MESSAGE_LENGTH];
-    sscanf(msg->message, "%d %s", &receiver, text);
-
     char response[MESSAGE_LENGTH];
+
+    sscanf(msg->message, "%d %s", &receiver, text);
     prepare_date_response(receiver, text, response);
 
     if (is_client_available(receiver)) {
@@ -300,12 +297,12 @@ int main() {
     initialize_server();
     struct q_message buffer;
     while (running) {
+        strcpy(buffer.message, "");
         if (msgrcv(server_queue_id, &buffer, MSIZE, -(NUMBER_OF_COMMANDS), 0) != -1) {
             process_message(&buffer);
         }
     }
-
-    exit(0);
+    exit(3);
 }
 
 // server loop
