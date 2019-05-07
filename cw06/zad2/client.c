@@ -10,7 +10,7 @@
 #include "utils6.h"
 
 bool running = true;
-char *queue_name;
+char *client_queue_name;
 int server_queue_id = -1;
 int client_queue_id = -1;
 int client_id = -1;
@@ -36,9 +36,9 @@ void receive_message(struct q_message *msg) {
 void close_client() {
     mq_close(server_queue_id);
     mq_close(client_queue_id);
-    if (mq_unlink(queue_name) == -1)
+    if (mq_unlink(client_queue_name) == -1)
         show_error("Error while deleting client's queue");
-    free(queue_name);
+    free(client_queue_name);
     exit(0);
 }
 
@@ -58,7 +58,7 @@ int extract_1argument(char *argv, char *arg1) {
 void execute_init() {
     printf("Executing INIT command.\n");
     struct q_message msg;
-    strcpy(msg.message, queue_name);
+    strcpy(msg.message, client_queue_name);
     msg.mtype = INIT;
     msg.client_id = getpid();
 
@@ -170,6 +170,8 @@ void SIGUSR_handler(int sig) {
     switch (msg.mtype) {
         case INIT:
             sscanf(msg.message, "%d", &client_id);
+            printf("Initialized as client: %d with queue: %d named: %s\n",
+                   client_id, client_queue_id, client_queue_name);
             break;
         case LIST:
             printf("%s", msg.message);
@@ -244,7 +246,8 @@ int main() {
     queue_attr.mq_maxmsg = QUEUE_SIZE;
     queue_attr.mq_msgsize = MSIZE;
 
-    client_queue_id = mq_open(receive_client_queue_name(), O_RDONLY | O_CREAT | O_EXCL, 0666, &queue_attr);
+    client_queue_name = receive_client_queue_name();
+    client_queue_id = mq_open(client_queue_name, O_RDONLY | O_CREAT | O_EXCL, 0666, &queue_attr);
     if (client_queue_id == -1) show_error("Error while opening client's queue");
     printf("Accessed private queue with key: %d\n", client_queue_id);
 

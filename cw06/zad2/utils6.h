@@ -13,8 +13,8 @@
 #define NUMBER_OF_COMMANDS 10
 #define MAX_FRIENDS 20
 #define MAX_CLIENTS 20
-#define SERVER_QUEUE_NAME "/SO_ServerQueue"
-#define QUEUE_SIZE 30
+#define SERVER_QUEUE_NAME "/serverqueue"
+#define QUEUE_SIZE 10
 #define MSIZE sizeof(struct q_message)
 
 struct q_message {

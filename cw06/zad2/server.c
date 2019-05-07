@@ -4,9 +4,11 @@
 #include <string.h>
 #include <signal.h>
 #include <stdbool.h>
-#include <mqueue.h>
 #include <sys/ipc.h>
 #include <time.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <mqueue.h>
 
 #include "utils6.h"
 
@@ -46,7 +48,7 @@ void initialize_server() {
     queue_attr.mq_maxmsg = QUEUE_SIZE;
     queue_attr.mq_msgsize = MSIZE;
 
-    server_queue_id = mq_open(SERVER_QUEUE_NAME, O_RDONLY | O_CREAT, 0666, &queue_attr);
+    server_queue_id = mq_open(SERVER_QUEUE_NAME, O_RDWR | O_CREAT | O_NONBLOCK, 0666, &queue_attr);
     if (server_queue_id == -1)show_error("Error while creating server queue");
     printf("Accessed server's queue with key: %d\n", server_queue_id);
 }
@@ -340,5 +342,6 @@ int main() {
         if (mq_receive(server_queue_id, (char *) &buffer, MSIZE, NULL) != -1)
             process_message(&buffer);
     }
+
     exit(3);
 }
