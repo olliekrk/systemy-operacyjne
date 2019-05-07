@@ -1,7 +1,3 @@
-//
-// Created by olliekrk on 03.05.19.
-//
-
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
@@ -14,6 +10,8 @@ bool running = true;
 int server_queue_id = -1;
 int client_queue_id = -1;
 int client_id = -1;
+
+int process_command(FILE *file);
 
 // messages handling
 void send_message(enum q_type type, char message[MESSAGE_LENGTH]) {
@@ -30,14 +28,14 @@ void receive_message(struct q_message *msg) {
         show_error("Error while receiving response from the server");
 }
 
-// other
+// general functions & utils
 void close_client() {
     if (msgctl(client_queue_id, IPC_RMID, NULL) == -1)
         show_error("Error while deleting client's queue");
     exit(0);
 }
 
-int extract_command_argument(char argv[COMMAND_LENGTH], char result_args[COMMAND_LENGTH]) {
+int extract_1argument(char *argv, char *arg1) {
     char command[COMMAND_LENGTH];
     char args[COMMAND_LENGTH];
     int no_args = sscanf(argv, "%s %s", command, args);
@@ -45,11 +43,9 @@ int extract_command_argument(char argv[COMMAND_LENGTH], char result_args[COMMAND
         fprintf(stderr, "Missing command argument(s)\n");
         return -1;
     }
-    strcpy(result_args, args);
+    strcpy(arg1, args);
     return 0;
 }
-
-int process_command(FILE *file);
 
 // client commands 'handlers'
 void execute_init() {
@@ -83,7 +79,7 @@ void execute_list() {
 void execute_read(char argv[COMMAND_LENGTH]) {
     printf("Executing READ command.\n");
     char filename[COMMAND_LENGTH];
-    if (extract_command_argument(argv, filename) == -1) return;
+    if (extract_1argument(argv, filename) == -1) return;
 
     FILE *file = fopen(filename, "r");
     if (!file)
@@ -96,11 +92,10 @@ void execute_read(char argv[COMMAND_LENGTH]) {
 void execute_echo(char argv[COMMAND_LENGTH]) {
     printf("Executing ECHO command.\n");
     char message[MESSAGE_LENGTH];
-    if (extract_command_argument(argv, message) == -1) return;
+    if (extract_1argument(argv, message) == -1) return;
 
     send_message(ECHO, message);
     raise(SIGUSR1);
-
 }
 
 void execute_friends(char argv[COMMAND_LENGTH]) {
@@ -118,31 +113,28 @@ void execute_friends(char argv[COMMAND_LENGTH]) {
 void execute_add(char argv[COMMAND_LENGTH]) {
     printf("Executing ADD command.\n");
     char message[MESSAGE_LENGTH];
-    if (extract_command_argument(argv, message) == -1) return;
+    if (extract_1argument(argv, message) == -1) return;
     send_message(ADD, message);
 }
 
 void execute_del(char argv[COMMAND_LENGTH]) {
     printf("Executing DEL command.\n");
     char message[MESSAGE_LENGTH];
-    if (extract_command_argument(argv, message) == -1) return;
+    if (extract_1argument(argv, message) == -1) return;
     send_message(DEL, message);
 }
 
 void execute_2all(char argv[COMMAND_LENGTH]) {
     printf("Executing 2ALL command.\n");
     char message[MESSAGE_LENGTH];
-    if (extract_command_argument(argv, message) == -1) {
-        printf("Failed\n");
-        return;
-    }
+    if (extract_1argument(argv, message) == -1) return;
     send_message(_2ALL, message);
 }
 
 void execute_2friends(char argv[COMMAND_LENGTH]) {
     printf("Executing 2FRIENDS command.\n");
     char message[MESSAGE_LENGTH];
-    if (extract_command_argument(argv, message) == -1) return;
+    if (extract_1argument(argv, message) == -1) return;
     send_message(_2FRIENDS, message);
 }
 
@@ -179,7 +171,7 @@ void SIGUSR_handler(int sig) {
             printf("%s\n", msg.message);
             break;
         case ECHO:
-            printf("[ECHO]:%s\n", msg.message);
+            printf("[ECHO]: %s", msg.message);
             break;
         case _2ONE:
             printf("[PRIVATE]: %s", msg.message);
@@ -249,9 +241,8 @@ int main() {
     printf("Accessed private queue with key: %d\n", client_queue_id);
 
     execute_init();
-    while (running) {
+    while (running)
         process_command(fdopen(STDIN_FILENO, "r"));
-    }
 
     exit(3);
 }

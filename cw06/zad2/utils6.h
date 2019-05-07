@@ -1,7 +1,3 @@
-//
-// Created by olliekrk on 03.05.19.
-//
-
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <stdio.h>
@@ -13,13 +9,12 @@
 
 #define COMMAND_LENGTH 2048
 #define MESSAGE_LENGTH 2048
-#define FRIENDS_DELIMITER ','
+#define FRIENDS_DELIMITER ","
 #define NUMBER_OF_COMMANDS 10
 #define MAX_FRIENDS 20
 #define MAX_CLIENTS 20
-#define SERVER_QUEUE_NAME "/serverqueue2"
-#define QUEUE_SIZE 9
-
+#define SERVER_QUEUE_NAME "/SO_ServerQueue"
+#define QUEUE_SIZE 30
 #define MSIZE sizeof(struct q_message)
 
 struct q_message {
@@ -29,16 +24,16 @@ struct q_message {
 };
 
 enum q_type {
-    STOP = 1,
-    INIT = 2,
-    LIST = 3,
-    FRIENDS = 4,
-    ADD = 5,
-    DEL = 6,
-    ECHO = 7,
-    _2ONE = 8,
-    _2FRIENDS = 9,
-    _2ALL = 10
+    STOP = 10,
+    INIT = 9,
+    LIST = 8,
+    FRIENDS = 7,
+    ADD = 6,
+    DEL = 5,
+    ECHO = 4,
+    _2ONE = 3,
+    _2FRIENDS = 2,
+    _2ALL = 1
 };
 
 void show_error(const char *message) {
@@ -52,21 +47,17 @@ int message_priority(enum q_type type) {
             return 10;
         case INIT:
             return 9;
-        case FRIENDS:
-        case ADD:
-        case DEL:
         case LIST:
+        case FRIENDS:
             return 8;
         default:
             return 1;
     }
 }
 
-// for generating queue keys
-
 char *receive_client_queue_name() {
     char *queue_name = malloc(32 * sizeof(char));
-    sprintf(queue_name, "/cli%d%d", getpid(), rand() % 1000);
+    sprintf(queue_name, "/client_%d_%d", getpid(), rand() % 1000);
     return queue_name;
 }
 

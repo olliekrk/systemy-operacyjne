@@ -1,8 +1,3 @@
-//
-// Created by olliekrk on 03.05.19.
-//
-
-
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/msg.h>
@@ -20,23 +15,21 @@ struct q_client {
     int no_friends;
 };
 
-int running = true;
+bool running = true;
 int server_queue_id = -1;
 struct q_client clients[MAX_CLIENTS];
 
 void SIGINT_handler(int sig);
 
-void process_message(struct q_message *msg);
-
-// general functions
-
+// general functions & utils
 bool is_client_available(int client_id) {
     return client_id < MAX_CLIENTS && client_id >= 0 && clients[client_id].queue_id != -1;
 }
 
 void close_server() {
-    if (msgctl(server_queue_id, IPC_RMID, NULL) == -1) show_error("Error while deleting queue");
-    else exit(0);
+    if (msgctl(server_queue_id, IPC_RMID, NULL) == -1)
+        show_error("Error while closing the server");
+    exit(0);
 }
 
 void initialize_server() {
@@ -62,7 +55,6 @@ void prepare_date_response(pid_t client_id, char *message, char *response) {
 }
 
 // messaging
-
 int send_message(int client_id, enum q_type type, char message[MESSAGE_LENGTH]) {
     struct q_message response;
     response.mtype = type;
@@ -88,13 +80,12 @@ void add_friends(pid_t client_id, char friends_list[MESSAGE_LENGTH]) {
         int friend_id = (int) strtol(friend, NULL, 10);
 
         // check if such friend is already on the list
-        for (int i = 0; i < clients[client_id].no_friends; i++) {
+        for (int i = 0; i < clients[client_id].no_friends; i++)
             if (friend_id == clients[client_id].friends[i])
                 friend_id = -1;
-        }
 
         // if it's not on the list and its ID is valid then add to friends
-        if (friend_id < MAX_FRIENDS && friend_id >= 0 && friend_id != client_id) {
+        if (friend_id >= 0 && friend_id < MAX_FRIENDS && friend_id != client_id) {
             clients[client_id].friends[clients[client_id].no_friends] = friend_id;
             clients[client_id].no_friends++;
         }
@@ -108,8 +99,12 @@ void execute_stop(struct q_message *msg) {
 
     //shutting down only one client
     if (msg != NULL) {
-        printf("Executing STOP for client: %d\n", msg->client_id);
-        clients[msg->client_id].queue_id = -1;
+        if (!is_client_available(msg->client_id)) {
+            fprintf(stderr, "Failed to STOP client: %d\n", msg->client_id);
+        } else {
+            printf("Executing STOP for client: %d\n", msg->client_id);
+            clients[msg->client_id].queue_id = -1;
+        }
         return;
     }
 
@@ -131,7 +126,7 @@ void execute_list(struct q_message *msg) {
     char buffer[MESSAGE_LENGTH];
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (clients[i].queue_id >= 0) {
-            sprintf(buffer, "Client's ID: %d\tClient Queue's ID:%d\n", i, clients[i].queue_id);
+            sprintf(buffer, "ClientID: %d\tQueueID: %d\n", i, clients[i].queue_id);
             strcat(list, buffer);
         }
     }
@@ -146,7 +141,7 @@ void execute_init(struct q_message *msg) {
             break;
 
     if (available_id >= MAX_CLIENTS) {
-        fprintf(stdout, "INIT failed: Clients limit is reached");
+        printf("INIT failed: Clients limit is reached\n");
         return;
     }
 
@@ -293,18 +288,6 @@ void SIGINT_handler(int sig) {
     execute_stop(NULL);
 }
 
-int main() {
-    initialize_server();
-    struct q_message buffer;
-    while (running) {
-        strcpy(buffer.message, "");
-        if (msgrcv(server_queue_id, &buffer, MSIZE, -(NUMBER_OF_COMMANDS), 0) != -1) {
-            process_message(&buffer);
-        }
-    }
-    exit(3);
-}
-
 // server loop
 void process_message(struct q_message *msg) {
     switch (msg->mtype) {
@@ -339,4 +322,14 @@ void process_message(struct q_message *msg) {
             execute_del(msg);
             break;
     }
+}
+
+int main() {
+    initialize_server();
+    struct q_message buffer;
+    while (running) {
+        if (msgrcv(server_queue_id, &buffer, MSIZE, -(NUMBER_OF_COMMANDS), 0) != -1)
+            process_message(&buffer);
+    }
+    exit(3);
 }

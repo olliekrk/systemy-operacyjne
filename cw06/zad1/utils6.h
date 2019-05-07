@@ -45,7 +45,6 @@ void show_error(const char *message) {
 }
 
 // for generating queue keys
-
 key_t receive_key(int id) {
     char *home_path = getenv("HOME");
     if (!home_path)

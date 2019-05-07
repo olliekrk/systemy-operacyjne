@@ -15,63 +15,76 @@ int server_queue_id = -1;
 int client_queue_id = -1;
 int client_id = -1;
 
+int process_command(FILE *file);
+
+// messages handling
 void send_message(enum q_type type, char message[MESSAGE_LENGTH]) {
     struct q_message msg;
     msg.mtype = type;
     msg.client_id = client_id;
     strcpy(msg.message, message);
-
-    if (mq_send(server_queue_id, (char *) &msg, MESSAGE_LENGTH, message_priority(type)) == -1)
+    if (mq_send(server_queue_id, (char *) &msg, MSIZE, message_priority(type)) == -1)
         show_error("Error while sending message to the server");
 }
 
 void receive_message(struct q_message *msg) {
-    printf("Awaiting for server's response...\n");
-    if (mq_receive(client_queue_id, (char *) msg, MESSAGE_LENGTH, NULL) == -1)
+    if (mq_receive(client_queue_id, (char *) msg, MSIZE, NULL) == -1)
         show_error("Error while receiving response from the server");
-    printf("Received response!\n");
 }
 
-int process_command(FILE *file);
-
+// general functions & utils
 void close_client() {
     mq_close(server_queue_id);
     mq_close(client_queue_id);
-    mq_unlink(queue_name);
+    if (mq_unlink(queue_name) == -1)
+        show_error("Error while deleting client's queue");
     free(queue_name);
-}
-
-// client commands 'handlers'
-
-void execute_init() {
-    struct q_message msg;
-    msg.mtype = INIT;
-    msg.client_id = getpid();
-    strcpy(msg.message, queue_name);
-
-    if (mq_send(server_queue_id, (char *) &msg, MESSAGE_LENGTH, message_priority(INIT)) == -1) {
-        show_error("Error while sending message");
-    }
-    receive_message(&msg);
-
-    sscanf(msg.message, "%d", &client_id);
-}
-
-void execute_stop() {
-    running = false;
-    send_message(STOP, "");
     exit(0);
 }
 
-void execute_read(char argv[COMMAND_LENGTH]) {
+int extract_1argument(char *argv, char *arg1) {
     char command[COMMAND_LENGTH];
-    char filename[COMMAND_LENGTH];
-
-    int no_args = sscanf(argv, "%s %s", command, filename);
+    char args[COMMAND_LENGTH];
+    int no_args = sscanf(argv, "%s %s", command, args);
     if (no_args == EOF || no_args < 2) {
-        fprintf(stderr, "Missing file name argument\n");
-        return;
+        fprintf(stderr, "Missing command argument(s)\n");
+        return -1;
     }
+    strcpy(arg1, args);
+    return 0;
+}
+
+// client commands 'handlers'
+void execute_init() {
+    printf("Executing INIT command.\n");
+    struct q_message msg;
+    strcpy(msg.message, queue_name);
+    msg.mtype = INIT;
+    msg.client_id = getpid();
+
+    if (mq_send(server_queue_id, (char *) &msg, MSIZE, message_priority(INIT)) == -1)
+        show_error("Error while sending message");
+
+    raise(SIGUSR1);
+}
+
+void execute_stop() {
+    printf("Executing STOP command.\n");
+    send_message(STOP, "");
+    running = false;
+    exit(3);
+}
+
+void execute_list() {
+    printf("Executing LIST command.\n");
+    send_message(LIST, "");
+    raise(SIGUSR1);
+}
+
+void execute_read(char argv[COMMAND_LENGTH]) {
+    printf("Executing READ command.\n");
+    char filename[COMMAND_LENGTH];
+    if (extract_1argument(argv, filename) == -1) return;
 
     FILE *file = fopen(filename, "r");
     if (!file)
@@ -82,31 +95,16 @@ void execute_read(char argv[COMMAND_LENGTH]) {
 }
 
 void execute_echo(char argv[COMMAND_LENGTH]) {
-    char command[COMMAND_LENGTH];
+    printf("Executing ECHO command.\n");
     char message[MESSAGE_LENGTH];
-    int argc = sscanf(argv, "%s %s", command, message);
-    if (argc == EOF || argc < 2) {
-        printf("Invalid number of arguments");
-        return;
-    }
-    send_message(ECHO, message);
-    struct q_message msg;
-    receive_message(&msg);
-    if (msg.mtype != ECHO)
-        show_error("Invalid response type from the server");
-    printf("%s\n", msg.message);
-}
+    if (extract_1argument(argv, message) == -1) return;
 
-void execute_list() {
-    send_message(LIST, "");
-    struct q_message msg;
-    receive_message(&msg);
-    if (msg.mtype != LIST)
-        show_error("Invalid response type from the server");
-    printf("%s\n", msg.message);
+    send_message(ECHO, message);
+    raise(SIGUSR1);
 }
 
 void execute_friends(char argv[COMMAND_LENGTH]) {
+    printf("Executing FRIENDS command.\n");
     char command[COMMAND_LENGTH];
     char message[MESSAGE_LENGTH];
     int argc = sscanf(argv, "%s %s", command, message);
@@ -118,39 +116,35 @@ void execute_friends(char argv[COMMAND_LENGTH]) {
 }
 
 void execute_add(char argv[COMMAND_LENGTH]) {
-    char command[COMMAND_LENGTH];
+    printf("Executing ADD command.\n");
     char message[MESSAGE_LENGTH];
-    int argc = sscanf(argv, "%s %s", command, message);
-    if (argc == EOF || argc < 2) {
-        printf("Invalid number of arguments");
-        return;
-    }
+    if (extract_1argument(argv, message) == -1) return;
     send_message(ADD, message);
 }
 
 void execute_del(char argv[COMMAND_LENGTH]) {
-    char command[COMMAND_LENGTH];
+    printf("Executing DEL command.\n");
     char message[MESSAGE_LENGTH];
-    int argc = sscanf(argv, "%s %s", command, message);
-    if (argc == EOF || argc < 2) {
-        printf("Invalid number of arguments");
-        return;
-    }
+    if (extract_1argument(argv, message) == -1) return;
     send_message(DEL, message);
 }
 
 void execute_2all(char argv[COMMAND_LENGTH]) {
-    char command[COMMAND_LENGTH];
+    printf("Executing 2ALL command.\n");
     char message[MESSAGE_LENGTH];
-    int argc = sscanf(argv, "%s %s", command, message);
-    if (argc == EOF || argc < 2) {
-        printf("Invalid number of arguments");
-        return;
-    }
+    if (extract_1argument(argv, message) == -1) return;
     send_message(_2ALL, message);
 }
 
+void execute_2friends(char argv[COMMAND_LENGTH]) {
+    printf("Executing 2FRIENDS command.\n");
+    char message[MESSAGE_LENGTH];
+    if (extract_1argument(argv, message) == -1) return;
+    send_message(_2FRIENDS, message);
+}
+
 void execute_2one(char argv[COMMAND_LENGTH]) {
+    printf("Executing 2ONE command.\n");
     char command[COMMAND_LENGTH];
     char message[MESSAGE_LENGTH];
     int receiver;
@@ -163,37 +157,38 @@ void execute_2one(char argv[COMMAND_LENGTH]) {
     send_message(_2ONE, command);
 }
 
-void execute_2friends(char argv[COMMAND_LENGTH]) {
-    char command[COMMAND_LENGTH];
-    char message[MESSAGE_LENGTH];
-    int argc = sscanf(argv, "%s %s", command, message);
-    if (argc == EOF || argc < 2) {
-        printf("Invalid number of arguments");
-        return;
-    }
-    send_message(_2FRIENDS, message);
-}
-
 // signal handlers
-
 void SIGINT_handler(int sig) {
+    printf("Signal SIGINT received.\n");
     execute_stop();
-    exit(0);
-//    close_client();
 }
 
 void SIGUSR_handler(int sig) {
     struct q_message msg;
     receive_message(&msg);
+
     switch (msg.mtype) {
-        case _2ONE:
-        case _2FRIENDS:
-        case _2ALL:
+        case INIT:
+            sscanf(msg.message, "%d", &client_id);
+            break;
+        case LIST:
             printf("%s", msg.message);
             break;
-        case STOP:
-            execute_stop();
+        case ECHO:
+            printf("[ECHO]: %s", msg.message);
             break;
+        case _2ONE:
+            printf("[PRIVATE]: %s", msg.message);
+            break;
+        case _2FRIENDS:
+            printf("[FRIENDS]: %s", msg.message);
+            break;
+        case _2ALL:
+            printf("[ALL]: %s", msg.message);
+            break;
+        case STOP:
+            printf("Executing global STOP command.\n");
+            exit(3);
     }
 }
 
@@ -209,58 +204,53 @@ int process_command(FILE *file) {
     if (argc == EOF || argc == 0)
         return 0;
 
-    if (strcmp(command, "ECHO") == 0) {
+    if (strcmp(command, "ECHO") == 0)
         execute_echo(argv);
-    } else if (strcmp(command, "LIST") == 0) {
+    else if (strcmp(command, "LIST") == 0)
         execute_list();
-    } else if (strcmp(command, "FRIENDS") == 0) {
+    else if (strcmp(command, "FRIENDS") == 0)
         execute_friends(argv);
-    } else if (strcmp(command, "2ALL") == 0) {
+    else if (strcmp(command, "2ALL") == 0)
         execute_2all(argv);
-    } else if (strcmp(command, "2FRIENDS") == 0) {
+    else if (strcmp(command, "2FRIENDS") == 0)
         execute_2friends(argv);
-    } else if (strcmp(command, "2ONE") == 0) {
+    else if (strcmp(command, "2ONE") == 0)
         execute_2one(argv);
-    } else if (strcmp(command, "STOP") == 0) {
+    else if (strcmp(command, "READ") == 0)
+        execute_read(argv);
+    else if (strcmp(command, "ADD") == 0)
+        execute_add(argv);
+    else if (strcmp(command, "DEL") == 0)
+        execute_del(argv);
+    else if (strcmp(command, "STOP") == 0) {
         execute_stop();
         return EOF;
-    } else if (strcmp(command, "READ") == 0) {
-        execute_read(argv);
-    } else if (strcmp(command, "ADD") == 0) {
-        execute_add(argv);
-    } else if (strcmp(command, "DEL") == 0) {
-        execute_del(argv);
-    } else {
+    } else
         printf("Invalid command\n");
-    }
+
     return 0;
 }
 
 int main() {
-    atexit(close_client);
     signal(SIGUSR1, SIGUSR_handler);
     signal(SIGINT, SIGINT_handler);
-
-    queue_name = receive_client_queue_name();
+    atexit(close_client);
 
     server_queue_id = mq_open(SERVER_QUEUE_NAME, O_WRONLY);
-    if (server_queue_id == -1)
-        show_error("Error while opening server's queue");
+    if (server_queue_id == -1) show_error("Error while opening server's queue");
+    printf("Accessed server's queue with key: %d\n", server_queue_id);
 
     struct mq_attr queue_attr;
     queue_attr.mq_maxmsg = QUEUE_SIZE;
-    queue_attr.mq_msgsize = MESSAGE_LENGTH;
+    queue_attr.mq_msgsize = MSIZE;
 
-    client_queue_id = mq_open(queue_name, O_RDONLY | O_CREAT | O_EXCL, 0666, &queue_attr);
-    if (client_queue_id == -1)
-        show_error("Error while opening client's queue");
-
-    printf("Accessed server's queue with key: %d\n", server_queue_id);
+    client_queue_id = mq_open(receive_client_queue_name(), O_RDONLY | O_CREAT | O_EXCL, 0666, &queue_attr);
+    if (client_queue_id == -1) show_error("Error while opening client's queue");
     printf("Accessed private queue with key: %d\n", client_queue_id);
-    execute_init();
 
-    while (running) {
+    execute_init();
+    while (running)
         process_command(fdopen(STDIN_FILENO, "r"));
-    }
-    return 0;
+
+    exit(3);
 }
