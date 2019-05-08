@@ -37,7 +37,6 @@ void close_server() {
 }
 
 void initialize_server() {
-    atexit(close_server);
     signal(SIGINT, SIGINT_handler);
     for (int i = 0; i < MAX_CLIENTS; i++) {
         clients[i].queue_id = -1;
@@ -120,9 +119,9 @@ void execute_stop(struct q_message *msg) {
     printf("Executing STOP globally\n");
     for (int i = 0; i < MAX_CLIENTS; i++) {
         if (clients[i].queue_id != -1) {
-            mq_close(clients[i].queue_id);
             send_message(i, STOP, "");
             kill(clients[i].pid, SIGUSR1);
+            mq_close(clients[i].queue_id);
         }
     }
 
@@ -335,6 +334,7 @@ void process_message(struct q_message *msg) {
 
 int main() {
     initialize_server();
+    atexit(close_server);
     struct q_message buffer;
     while (running) {
         buffer.mtype = -1;
@@ -342,6 +342,5 @@ int main() {
         if (mq_receive(server_queue_id, (char *) &buffer, MSIZE, NULL) != -1)
             process_message(&buffer);
     }
-
     exit(3);
 }

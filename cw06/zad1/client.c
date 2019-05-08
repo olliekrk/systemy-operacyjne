@@ -11,6 +11,10 @@ int server_queue_id = -1;
 int client_queue_id = -1;
 int client_id = -1;
 
+void SIGINT_handler(int sig);
+
+void SIGUSR_handler(int sig);
+
 int process_command(FILE *file);
 
 // messages handling
@@ -33,6 +37,19 @@ void close_client() {
     if (msgctl(client_queue_id, IPC_RMID, NULL) == -1)
         show_error("Error while deleting client's queue");
     exit(0);
+}
+
+void initialize_client() {
+    signal(SIGUSR1, SIGUSR_handler);
+    signal(SIGINT, SIGINT_handler);
+
+    server_queue_id = msgget(receive_server_queue_key(), 0);
+    if (server_queue_id == -1) show_error("Error while opening server's queue");
+    printf("Accessed server's queue with key: %d\n", server_queue_id);
+
+    client_queue_id = msgget(receive_client_queue_key(), IPC_CREAT | IPC_EXCL | 0666);
+    if (client_queue_id == -1) show_error("Error while opening client's queue");
+    printf("Accessed private queue with key: %d\n", client_queue_id);
 }
 
 int extract_1argument(char *argv, char *arg1) {
@@ -228,18 +245,8 @@ int process_command(FILE *file) {
 }
 
 int main() {
-    signal(SIGUSR1, SIGUSR_handler);
-    signal(SIGINT, SIGINT_handler);
+    initialize_client();
     atexit(close_client);
-
-    server_queue_id = msgget(receive_server_queue_key(), 0);
-    if (server_queue_id == -1) show_error("Error while opening server's queue");
-    printf("Accessed server's queue with key: %d\n", server_queue_id);
-
-    client_queue_id = msgget(receive_client_queue_key(), IPC_CREAT | IPC_EXCL | 0666);
-    if (client_queue_id == -1) show_error("Error while opening client's queue");
-    printf("Accessed private queue with key: %d\n", client_queue_id);
-
     execute_init();
     while (running)
         process_command(fdopen(STDIN_FILENO, "r"));

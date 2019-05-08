@@ -15,6 +15,10 @@ int server_queue_id = -1;
 int client_queue_id = -1;
 int client_id = -1;
 
+void SIGINT_handler(int sig);
+
+void SIGUSR_handler(int sig);
+
 int process_command(FILE *file);
 
 // messages handling
@@ -40,6 +44,24 @@ void close_client() {
         show_error("Error while deleting client's queue");
     free(client_queue_name);
     exit(0);
+}
+
+void initialize_client() {
+    signal(SIGUSR1, SIGUSR_handler);
+    signal(SIGINT, SIGINT_handler);
+
+    server_queue_id = mq_open(SERVER_QUEUE_NAME, O_WRONLY);
+    if (server_queue_id == -1) show_error("Error while opening server's queue");
+    printf("Accessed server's queue with key: %d\n", server_queue_id);
+
+    struct mq_attr queue_attr;
+    queue_attr.mq_maxmsg = QUEUE_SIZE;
+    queue_attr.mq_msgsize = MSIZE;
+
+    client_queue_name = receive_client_queue_name();
+    client_queue_id = mq_open(client_queue_name, O_RDONLY | O_CREAT | O_EXCL, 0666, &queue_attr);
+    if (client_queue_id == -1) show_error("Error while opening client's queue");
+    printf("Accessed private queue with key: %d\n", client_queue_id);
 }
 
 int extract_1argument(char *argv, char *arg1) {
@@ -234,26 +256,10 @@ int process_command(FILE *file) {
 }
 
 int main() {
-    signal(SIGUSR1, SIGUSR_handler);
-    signal(SIGINT, SIGINT_handler);
+    initialize_client();
     atexit(close_client);
-
-    server_queue_id = mq_open(SERVER_QUEUE_NAME, O_WRONLY);
-    if (server_queue_id == -1) show_error("Error while opening server's queue");
-    printf("Accessed server's queue with key: %d\n", server_queue_id);
-
-    struct mq_attr queue_attr;
-    queue_attr.mq_maxmsg = QUEUE_SIZE;
-    queue_attr.mq_msgsize = MSIZE;
-
-    client_queue_name = receive_client_queue_name();
-    client_queue_id = mq_open(client_queue_name, O_RDONLY | O_CREAT | O_EXCL, 0666, &queue_attr);
-    if (client_queue_id == -1) show_error("Error while opening client's queue");
-    printf("Accessed private queue with key: %d\n", client_queue_id);
-
     execute_init();
     while (running)
         process_command(fdopen(STDIN_FILENO, "r"));
-
     exit(3);
 }
