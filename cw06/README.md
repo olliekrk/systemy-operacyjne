@@ -8,7 +8,7 @@ System V:
 POSIX:
 
 <mqueue.h> - mq_open, mq_send, mq_receive, mq_getattr, mq_setattr, mq_close, mq_unlink, mq_notify
-##Zadanie 1. Prosty chat - System V (50%)
+## Zadanie 1. Prosty chat - System V (50%)
 Napisz prosty chat typu klient-serwer, w którym komunikacja zrealizowana jest za pomocą kolejek komunikatów - jedna, na zlecenia klientów dla serwera, druga, prywatna, na odpowiedzi.
 
 Serwer po uruchomieniu tworzy nową kolejkę komunikatów systemu V. Za pomocą tej kolejki klienci będą wysyłać komunikaty do serwera. Wysyłane zlecenia mają zawierać rodzaj zlecenia jako rodzaj komunikatu oraz informację od którego klienta zostały wysłane (ID klienta), w odpowiedzi rodzajem komunikatu ma być informacja identyfikująca czekającego na nią klienta.

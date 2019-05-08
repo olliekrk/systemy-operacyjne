@@ -1,4 +1,4 @@
-#5. Potoki nazwane i nienazwane
+# 5. Potoki nazwane i nienazwane
 ## Zadanie 1 (55%)
 Napisz interpreter poleceń przechowywanych w pliku (sciezka do pliku to pierwszy argument wywolania programu).
 
