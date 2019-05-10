@@ -17,6 +17,5 @@ void create_semaphores();
 
 void interrupt_handler(int);
 
-void semaphore_load_truck(int, int);
 
 #endif //KROLIKOLGIERD_TRUCKER_H

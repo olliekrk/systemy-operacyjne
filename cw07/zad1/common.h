@@ -11,13 +11,15 @@
 #include <sys/time.h>
 #include <signal.h>
 
-// weight related
-#define MAX_ITEM_WEIGHT 10
-#define DEFAULT_ITEM_WEIGHT 3
-#define DEFAULT_CYCLE 50
-
 #define SEM_SEED 88
 #define BELT_SEED 99
+
+#define NUMBER_OF_SEMAPHORES 3
+
+// specific conveyor belt semaphores IDs
+#define BELT_CAP_SEM 0
+#define BELT_LOAD_SEM 1
+#define GLOBAL_LOCK_SEM 2
 
 // data structures
 typedef enum event_type {
@@ -103,7 +105,7 @@ void print_event(belt_event *event) {
            event->current_cb_cap);
 }
 
-// for conveyor belt operations
+// for conveyor belt operations (cancerous)
 belt_item *belt_item_clone(belt_item original) {
     belt_item *copy = malloc(sizeof(belt_item));
     copy->weight = original.weight;
@@ -132,6 +134,12 @@ void belt_pop(conveyor_belt *belt) {
     belt->current_cap--;
 }
 
+void belt_push(conveyor_belt *belt, belt_item item) {
+    belt->items[belt->current_cap] = item;
+    belt->current_cap++;
+    belt->current_load += item.weight;
+}
+
 // for generating keys
 key_t receive_key(int id) {
     char *home_path = getenv("HOME");
@@ -155,6 +163,42 @@ key_t receive_belt_key() {
 void semaphore_set(int sem_set_id, int sem_id, int value) {
     if (semctl(sem_set_id, sem_id, SETVAL, value) == -1)
         show_error("Failed to set semaphore value");
+}
+
+void semaphore_load_truck(int sem_set_id, int item_weight) {
+    struct sembuf ops[2];
+
+    ops[0].sem_flg = 0;
+    ops[0].sem_num = BELT_LOAD_SEM;
+    ops[0].sem_op = item_weight;
+
+    ops[1].sem_flg = 0;
+    ops[1].sem_num = BELT_CAP_SEM;
+    ops[1].sem_op = 1;
+
+    if (semop(sem_set_id, ops, 2) == -1) show_error("Failed to load truck");
+}
+
+void semaphore_load_item(int sem_set_id, int item_weight) {
+    struct sembuf ops[2];
+
+    ops[0].sem_flg = 0;
+    ops[0].sem_num = BELT_LOAD_SEM;
+    ops[0].sem_op = -item_weight;
+
+    ops[1].sem_flg = 0;
+    ops[1].sem_num = BELT_CAP_SEM;
+    ops[1].sem_op = -1;
+
+    if (semop(sem_set_id, ops, 2) == -1) show_error("Failed to load truck");
+}
+
+void semaphore_lock_take(int sem_id) {
+
+}
+
+void semaphore_lock_release(int sem_id) {
+
 }
 
 #endif //CW7_UTILS

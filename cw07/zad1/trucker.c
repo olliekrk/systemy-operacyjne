@@ -49,7 +49,7 @@ int main(int argc, char **argv) {
         sleep(1);
     }
 
-    return 0;
+    exit(3);
 }
 
 int trucker_loop() {
@@ -102,6 +102,8 @@ void trucker_cleanup() {
     if (shmdt(belt) == -1) fprintf(stderr, "Failed to detach belt from process memory\n");
     if (shmctl(belt_id, IPC_RMID, NULL) == -1) fprintf(stderr, "Failed to delete conveyor belt\n");
     if (semctl(sem_id, 0, IPC_RMID) == -1) fprintf(stderr, "Failed to delete semaphores set\n");
+
+    exit(0);
 }
 
 void create_conveyor_belt() {
@@ -126,7 +128,7 @@ void create_conveyor_belt() {
 
 void create_semaphores() {
     key_t sem_key = receive_sem_key();
-    sem_id = semget(sem_key, 3, CREATION_FLAG);
+    sem_id = semget(sem_key, NUMBER_OF_SEMAPHORES, CREATION_FLAG);
     if (sem_id == -1) show_error("Failed to create semaphore(s)");
 
     semaphore_set(sem_id, BELT_CAP_SEM, CONVEYOR_BELT_CAP);
@@ -137,18 +139,4 @@ void create_semaphores() {
 void interrupt_handler(int s) {
     printf("(!)\tTrucker interrupted by SIGINT\n");
     exit(3);
-}
-
-void semaphore_load_truck(int sem_set_id, int item_weight) {
-    struct sembuf ops[2];
-
-    ops[0].sem_flg = 0;
-    ops[0].sem_num = BELT_LOAD_SEM;
-    ops[0].sem_op = item_weight;
-
-    ops[1].sem_flg = 0;
-    ops[1].sem_num = BELT_CAP_SEM;
-    ops[1].sem_op = 1;
-
-    if (semop(sem_set_id, ops, 2) == -1) show_error("Failed to load truck");
 }
