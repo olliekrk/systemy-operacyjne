@@ -31,13 +31,13 @@ typedef enum event_type {
 
 typedef struct timeval tv;
 
-typedef struct factory_event {
+typedef struct belt_event {
     event_type type;
     tv time;
     pid_t pid; // PID for worker events
     int current_cb_cap; // cb = conveyor belt
     int current_cb_load;
-} factory_event;
+} belt_event;
 
 typedef struct belt_item {
     pid_t loader_pid;
@@ -63,8 +63,8 @@ void get_current_time(struct timeval *buffer) {
     gettimeofday(buffer, NULL);
 }
 
-factory_event *generate_factory_event(conveyor_belt *belt, event_type type) {
-    factory_event *event = malloc(sizeof(factory_event));
+belt_event *generate_event(conveyor_belt *belt, event_type type) {
+    belt_event *event = malloc(sizeof(belt_event));
     get_current_time(&event->time);
     event->pid = getpid();
     event->type = type;
@@ -73,10 +73,63 @@ factory_event *generate_factory_event(conveyor_belt *belt, event_type type) {
     return event;
 }
 
+char *event_type_name(event_type type) {
+    switch (type) {
+        case TRUCK_ARRIVAL:
+            return "TRUCK_ARRIVAL";
+        case TRUCK_LOADING:
+            return "TRUCK_LOADING";
+        case TRUCK_DEPARTURE:
+            return "TRUCK_DEPARTURE";
+        case TRUCK_WAIT:
+            return "TRUCK_WAIT";
+        case LOADER_WAIT:
+            return "LOADER_WAIT";
+        case ITEM_LOADED:
+            return "ITEM_LOADED";
+    }
+}
+
+void print_event(belt_event *event) {
+    printf("EVENT: %s\n\t"
+           "TIME: %ld s\t%ld ms\n\t"
+           "PID: %d\n\t"
+           "CURRENT LOAD: %d kg\tCURRENT CAP: %d items\n",
+           event_type_name(event->type),
+           event->time.tv_sec,
+           event->time.tv_usec,
+           event->pid,
+           event->current_cb_load,
+           event->current_cb_cap);
+}
 
 // for conveyor belt operations
-belt_item belt_pop(conveyor_belt *belt) {
+belt_item *belt_item_clone(belt_item original) {
+    belt_item *copy = malloc(sizeof(belt_item));
+    copy->weight = original.weight;
+    copy->time = original.time;
+    copy->loader_pid = original.loader_pid;
 
+    return copy;
+}
+
+belt_item belt_peek(conveyor_belt *belt) {
+    return belt->items[0];
+}
+
+void belt_pop(conveyor_belt *belt) {
+    if (belt->current_cap == 0) show_error("Attempted to pop an item from empty belt");
+
+    belt_item popped;
+    int i = belt->current_cap - 1;
+    while (i > 0) {
+        popped = belt->items[i - 1];
+        belt->items[i - 1] = belt->items[i];
+        i--;
+    }
+
+    belt->current_load -= popped.weight;
+    belt->current_cap--;
 }
 
 // for generating keys
@@ -99,7 +152,7 @@ key_t receive_belt_key() {
 }
 
 // for managing semaphores
-void set_semaphore(int sem_set_id, int sem_id, int value) {
+void semaphore_set(int sem_set_id, int sem_id, int value) {
     if (semctl(sem_set_id, sem_id, SETVAL, value) == -1)
         show_error("Failed to set semaphore value");
 }

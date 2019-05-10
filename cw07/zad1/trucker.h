@@ -7,7 +7,7 @@
 
 #include "common.h"
 
-void trucker_loop();
+int trucker_loop();
 
 void trucker_cleanup();
 
@@ -15,10 +15,8 @@ void create_conveyor_belt();
 
 void create_semaphores();
 
-void create_loaders(int);
-
 void interrupt_handler(int);
 
-void print_factory_event(factory_event*);
+void semaphore_load_truck(int, int);
 
 #endif //KROLIKOLGIERD_TRUCKER_H
