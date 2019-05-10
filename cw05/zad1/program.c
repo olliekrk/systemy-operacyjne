@@ -53,6 +53,7 @@ int main(int argc, char **argv) {
             break;
 
         execute_command_line(line);
+
         while (counter < line.no_commands) {
             counter++;
             wait(NULL);
@@ -133,7 +134,7 @@ command parse_single_command(char *single_command) {
 void execute_command_line(command_line cmd_line) {
     //fd[0] -> end for output
     //fd[1] -> end for input
-    //dup2(fd[1], STDIN_FILENO) -> means that we replace STDIN with our pipe input end
+    //dup2(fd[0], STDIN_FILENO) -> means that we replace STDIN with our pipe output end
 
     int A[2];
     int B[2];

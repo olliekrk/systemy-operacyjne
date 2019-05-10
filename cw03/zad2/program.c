@@ -34,7 +34,7 @@ void exec_copy(char *f_name, int time_interval, int total_time);
 
 void monitoring(char *list, int time, int mode);
 
-void print_raport(int children);
+void list_request(int children);
 
 int main(int argc, char **argv) {
     if (argc < ARGS_REQUIRED) show_error("Not enough arguments");
@@ -264,10 +264,10 @@ void monitoring(char *list, int time, int mode) {
     free(list_content);
     free(f_name);
 
-    print_raport(no_children);
+    list_request(no_children);
 }
 
-void print_raport(int no_children) {
+void list_request(int no_children) {
     for (int i = 0; i < no_children; i++) {
         int exit_status;
         pid_t finished_pid = wait(&exit_status);

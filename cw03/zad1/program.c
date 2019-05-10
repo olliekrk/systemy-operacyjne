@@ -53,7 +53,7 @@ void dir_search(const char *dir_path, const char *relative_path) {
             sprintf(rel_path, "%s", current->d_name);
             sprintf(d_path, "%s/%s", dir_path, current->d_name);
         } else {
-            sprintf(rel_path, "%s/%s", rel_path, current->d_name);
+            sprintf(rel_path, "%s/%s", relative_path, current->d_name);
             sprintf(d_path, "%s/%s", dir_path, current->d_name);
         }
 
