@@ -8,3 +8,9 @@ build: loader.c trucker.c trucker.h common.h
 
 clean:
 	rm -f loader.o trucker.o loader trucker
+
+run_tracker: trucker.c trucker.h common.h
+	./trucker 100 150 10
+
+run_loader: loader.c loader.h common.h
+	./loader 10 1

@@ -1,42 +1,14 @@
-/*
-responsibilities:
-- managing common memory (conveyor belt CB unloading)
-- SIGINT handler for cleanup
-- has to be run before loader.c (handle this case in loader.c)
-- before closing it should:
-    block semaphore,
-    clean up CB load
-    + in POSIX notify workers to perform their cleanup
-*/
-
 #include "trucker.h"
-
-#define CREATION_FLAG IPC_CREAT | 0666 /*| IPC_EXCL*/
-
-// weight related
-int TRUCK_LOAD = 0;
-int CONVEYOR_BELT_LOAD = 0;
-
-// capacity related
-int CONVEYOR_BELT_CAP = 0;
-
-// IDs
-int sem_id = -1;
-int belt_id = -1;
-conveyor_belt *belt = NULL;
-
-// specific conveyor belt semaphores IDs
-#define BELT_CAP_SEM 0
-#define BELT_LOAD_SEM 1
-#define GLOBAL_LOCK_SEM 2
 
 int main(int argc, char **argv) {
     if (argc < 4)
-        show_error("Invalid number of arguments");
+        show_error("Invalid number of arguments:\n\t<TRUCK_LOAD> <BELT_LOAD> <BELT_CAP>");
 
     TRUCK_LOAD = strtol(argv[1], NULL, 10);
     CONVEYOR_BELT_LOAD = strtol(argv[2], NULL, 10);
     CONVEYOR_BELT_CAP = strtol(argv[3], NULL, 10);
+    if (CONVEYOR_BELT_CAP > MAXIMUM_BELT_CAP)
+        show_error("Conveyor belt maximum capacity is exceeded");
 
     atexit(trucker_cleanup);
     signal(SIGINT, interrupt_handler);
@@ -45,64 +17,77 @@ int main(int argc, char **argv) {
     create_conveyor_belt();
 
     while (belt) {
-        trucker_loop();
+        trucker_loop(1);
         sleep(1);
     }
 
     exit(3);
 }
 
-int trucker_loop() {
+int trucker_loop(int locking) {
     if (belt->current_cap > 0) {
         belt_item item = belt_peek(belt);
-        if (item.weight + belt->current_load > TRUCK_LOAD) {
-            print_event(generate_event(belt, TRUCK_DEPARTURE));
-            sleep(1);
-            print_event(generate_event(belt, TRUCK_ARRIVAL));
-            TRUCK_LOAD = 0;
+        if (item.weight + current_truck_load > TRUCK_LOAD) {
+            trucker_unload_truck(locking);
+            return 1;
         } else {
-            belt_pop(belt);
-            semaphore_load_truck(sem_id, item.weight);
+            if (locking) semaphore_item_to_truck(sem_id, item.weight);// lock
 
-            belt_event event;
-            event.type = TRUCK_LOADING;
-            event.pid = item.loader_pid;
-            event.current_cb_cap = belt->current_cap;
-            event.current_cb_load = belt->current_load;
-            get_current_time(&item.time);
+            trucker_load_truck();
 
-            print_event(&event);
-
-            tv diff;
-            timersub(&item.time, &event.time, &diff);
-            printf("\tTIME ON BELT: %ld s\t%ld ms\n", diff.tv_sec, diff.tv_usec);
+            if (locking) semaphore_lock_release(sem_id);// unlock
+            return 1;
         }
-        return 1;
     } else {
         print_event(generate_event(belt, TRUCK_WAIT));
         return 0;
     }
 }
 
-void trucker_cleanup() {
-    /*
-     *  W przypadku, gdy trucker kończy pracę, powinien:
-     *  1. zablokować semafor taśmy transportowej dla pracowników,
-     *  2. załadować to co pozostało na taśmie
-     */
+void trucker_unload_truck(int locking) {
+    // according to the instructions, new packages must not land on the belt if the truck is away
+    if (locking) semaphore_lock_take(sem_id);
 
+    print_event(generate_event(belt, TRUCK_DEPARTURE));
+    sleep(1);
+    print_event(generate_event(belt, TRUCK_ARRIVAL));
+    current_truck_load = 0;
+
+    if (locking) semaphore_lock_release(sem_id);
+}
+
+void trucker_load_truck() {
+    belt_item item = belt_peek(belt);
+    belt_pop(belt);
+
+    current_truck_load += item.weight;
+
+    belt_event event;
+    event.type = TRUCK_LOADING;
+    event.pid = item.loader_pid;
+    event.current_cb_cap = belt->current_cap;
+    event.current_cb_load = belt->current_load;
+    get_current_time(&event.time);
+    print_event(&event);
+
+    tv diff;
+    timersub(&event.time, &item.time, &diff);
+    printf("\tCURRENT TRUCK LOAD: %d\n\tTIME ON BELT: %ld s\t%ld ms\n", current_truck_load, diff.tv_sec, diff.tv_usec);
+}
+
+void trucker_cleanup() {
     //1.
     semaphore_set(sem_id, GLOBAL_LOCK_SEM, 0);
 
     //2.
-    while (trucker_loop() == 1) {}
+    while (trucker_loop(0) == 1)
+        sleep(1);
 
-    free(belt->items);
-    belt->current_load = belt->current_cap = 0;
+    if (semctl(sem_id, 0, IPC_RMID) == -1) fprintf(stderr, "Failed to delete semaphores set\n");
     if (shmdt(belt) == -1) fprintf(stderr, "Failed to detach belt from process memory\n");
     if (shmctl(belt_id, IPC_RMID, NULL) == -1) fprintf(stderr, "Failed to delete conveyor belt\n");
-    if (semctl(sem_id, 0, IPC_RMID) == -1) fprintf(stderr, "Failed to delete semaphores set\n");
 
+    printf("Trucker has finished its work.\n");
     exit(0);
 }
 
@@ -119,7 +104,6 @@ void create_conveyor_belt() {
     belt->max_cap = CONVEYOR_BELT_CAP;
     belt->current_load = 0;
     belt->max_load = CONVEYOR_BELT_LOAD;
-    belt->items = calloc(CONVEYOR_BELT_CAP, sizeof(belt_item));
 
     // initialize with event of truck arrival
     belt_event *init_event = generate_event(belt, TRUCK_ARRIVAL);

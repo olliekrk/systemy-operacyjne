@@ -1,27 +1,14 @@
 #include "loader.h"
 
-/*
- * it has to run after trucker.c has started
- * */
-
-int ITEM_WEIGHT = 0;
-int NUMBER_OF_CYCLES = -1; // infinity by default
-int NUMBER_OF_LOADERS = 1; // one by default
-
-int sem_id = -1;
-int belt_id = -1;
-conveyor_belt *belt = NULL;
-
 int main(int argc, char **argv) {
     if (argc < 2)
-        show_error("Invalid number of arguments");
+        show_error("Invalid number of arguments:\n\t<ITEM_WEIGHT> [<NUMBER_OF_LOADERS>] [<NUMBER_OF_CYCLES>]");
 
     ITEM_WEIGHT = strtol(argv[1], NULL, 10);
     if (argc > 2) NUMBER_OF_LOADERS = strtol(argv[2], NULL, 10);
     if (argc > 3) NUMBER_OF_CYCLES = strtol(argv[3], NULL, 10);
 
     atexit(loader_cleanup);
-
     access_semaphores();
     access_conveyor_belt();
 
@@ -30,27 +17,37 @@ int main(int argc, char **argv) {
 }
 
 void loader_loop() {
+    printf("Loader with PID %d started working.\n", getpid());
     belt_item item;
     item.weight = ITEM_WEIGHT;
     item.loader_pid = getpid();
+
+    int was_waiting = 0; // to reduce frequency of printing 'WAIT' events
+
     while (abs(NUMBER_OF_CYCLES) > 0) {
-        // todo
-        get_current_time(&item.time);
-
-        semaphore_load_item(sem_id, item.weight);
-        semaphore_lock_take(sem_id);
-
-        belt_push(belt, item);
-        print_event(generate_event(belt, ITEM_LOADED));
-
-        semaphore_lock_release(sem_id);
-
-        NUMBER_OF_CYCLES--;
+        if (semaphore_item_to_belt(sem_id, ITEM_WEIGHT) == 0) { // lock
+            loader_load_belt(item);
+            semaphore_lock_release(sem_id); // unlock
+            was_waiting = 0;
+            sleep(1);
+        } else {
+            if (semaphore_get(sem_id, GLOBAL_LOCK_SEM) == -1) exit(3);
+            if (was_waiting == 0) print_event(generate_event(belt, LOADER_WAIT));
+            was_waiting = 1;
+        }
     }
+}
+
+void loader_load_belt(belt_item item) {
+    get_current_time(&item.time);
+    belt_push(belt, item);
+    print_event(generate_event(belt, ITEM_LOADED));
+    NUMBER_OF_CYCLES--;
 }
 
 void loader_cleanup() {
     shmdt(belt);
+    printf("Loader has finished its work.\n");
     exit(0);
 }
 

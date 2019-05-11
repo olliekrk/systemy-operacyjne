@@ -7,7 +7,17 @@
 
 #include "common.h"
 
+int ITEM_WEIGHT = 0;
+int NUMBER_OF_CYCLES = -1; // infinity by default
+int NUMBER_OF_LOADERS = 1; // one by default
+
+int sem_id = -1;
+int belt_id = -1;
+conveyor_belt *belt = NULL;
+
 void loader_loop();
+
+void loader_load_belt(belt_item);
 
 void loader_cleanup();
 

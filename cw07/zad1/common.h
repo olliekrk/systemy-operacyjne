@@ -17,11 +17,16 @@
 #define NUMBER_OF_SEMAPHORES 3
 
 // specific conveyor belt semaphores IDs
-#define BELT_CAP_SEM 0
-#define BELT_LOAD_SEM 1
+#define BELT_CAP_SEM 0 // capacity left on conveyor belt
+#define BELT_LOAD_SEM 1 // load left on conveyor belt
 #define GLOBAL_LOCK_SEM 2
 
+// so that items arrays can be static
+#define MAXIMUM_BELT_CAP 500
+
 // data structures
+typedef struct timeval tv;
+
 typedef enum event_type {
     TRUCK_ARRIVAL,
     TRUCK_LOADING,
@@ -30,8 +35,6 @@ typedef enum event_type {
     LOADER_WAIT,
     ITEM_LOADED
 } event_type;
-
-typedef struct timeval tv;
 
 typedef struct belt_event {
     event_type type;
@@ -52,7 +55,7 @@ typedef struct conveyor_belt {
     int current_cap;
     int max_load;
     int current_load;
-    belt_item *items;
+    belt_item items[MAXIMUM_BELT_CAP];
 } conveyor_belt;
 
 // utility
@@ -96,7 +99,7 @@ void print_event(belt_event *event) {
     printf("EVENT: %s\n\t"
            "TIME: %ld s\t%ld ms\n\t"
            "PID: %d\n\t"
-           "CURRENT LOAD: %d kg\tCURRENT CAP: %d items\n",
+           "CURRENT BELT LOAD: %d kg\tCURRENT BELT CAP: %d items\n",
            event_type_name(event->type),
            event->time.tv_sec,
            event->time.tv_usec,
@@ -106,15 +109,6 @@ void print_event(belt_event *event) {
 }
 
 // for conveyor belt operations (cancerous)
-belt_item *belt_item_clone(belt_item original) {
-    belt_item *copy = malloc(sizeof(belt_item));
-    copy->weight = original.weight;
-    copy->time = original.time;
-    copy->loader_pid = original.loader_pid;
-
-    return copy;
-}
-
 belt_item belt_peek(conveyor_belt *belt) {
     return belt->items[0];
 }
@@ -122,12 +116,10 @@ belt_item belt_peek(conveyor_belt *belt) {
 void belt_pop(conveyor_belt *belt) {
     if (belt->current_cap == 0) show_error("Attempted to pop an item from empty belt");
 
-    belt_item popped;
-    int i = belt->current_cap - 1;
-    while (i > 0) {
+    belt_item popped = belt->items[0];
+    for (int i = belt->current_cap - 1; i > 0; i--) {
         popped = belt->items[i - 1];
         belt->items[i - 1] = belt->items[i];
-        i--;
     }
 
     belt->current_load -= popped.weight;
@@ -136,8 +128,8 @@ void belt_pop(conveyor_belt *belt) {
 
 void belt_push(conveyor_belt *belt, belt_item item) {
     belt->items[belt->current_cap] = item;
-    belt->current_cap++;
     belt->current_load += item.weight;
+    belt->current_cap += 1;
 }
 
 // for generating keys
@@ -165,40 +157,62 @@ void semaphore_set(int sem_set_id, int sem_id, int value) {
         show_error("Failed to set semaphore value");
 }
 
-void semaphore_load_truck(int sem_set_id, int item_weight) {
-    struct sembuf ops[2];
+int semaphore_get(int sem_set_id, int sem_id) {
+    return semctl(sem_set_id, sem_id, GETVAL);
+}
 
-    ops[0].sem_flg = 0;
-    ops[0].sem_num = BELT_LOAD_SEM;
+int semaphore_item_to_truck(int sem_set_id, int item_weight) {
+    struct sembuf ops[3];
+
     ops[0].sem_op = item_weight;
-
-    ops[1].sem_flg = 0;
-    ops[1].sem_num = BELT_CAP_SEM;
-    ops[1].sem_op = 1;
-
-    if (semop(sem_set_id, ops, 2) == -1) show_error("Failed to load truck");
-}
-
-void semaphore_load_item(int sem_set_id, int item_weight) {
-    struct sembuf ops[2];
-
-    ops[0].sem_flg = 0;
     ops[0].sem_num = BELT_LOAD_SEM;
-    ops[0].sem_op = -item_weight;
+    ops[0].sem_flg = 0;
 
-    ops[1].sem_flg = 0;
+    ops[1].sem_op = 1;
     ops[1].sem_num = BELT_CAP_SEM;
+    ops[1].sem_flg = 0;
+
+    ops[2].sem_op = -1;
+    ops[2].sem_num = GLOBAL_LOCK_SEM;
+    ops[2].sem_flg = 0;
+
+    return semop(sem_set_id, ops, 3);
+}
+
+int semaphore_item_to_belt(int sem_set_id, int item_weight) {
+    struct sembuf ops[3];
+
+    ops[0].sem_op = -item_weight;
+    ops[0].sem_num = BELT_LOAD_SEM;
+    ops[0].sem_flg = IPC_NOWAIT;
+
     ops[1].sem_op = -1;
+    ops[1].sem_num = BELT_CAP_SEM;
+    ops[1].sem_flg = IPC_NOWAIT;
 
-    if (semop(sem_set_id, ops, 2) == -1) show_error("Failed to load truck");
+    ops[2].sem_op = -1;
+    ops[2].sem_num = GLOBAL_LOCK_SEM;
+    ops[2].sem_flg = IPC_NOWAIT;
+
+    return semop(sem_set_id, ops, 3);
 }
 
-void semaphore_lock_take(int sem_id) {
+int semaphore_lock_take(int sem_set_id) {
+    struct sembuf op[1];
+    op[0].sem_op = -1;
+    op[0].sem_num = GLOBAL_LOCK_SEM;
+    op[0].sem_flg = 0;
 
+    return semop(sem_set_id, op, 1);
 }
 
-void semaphore_lock_release(int sem_id) {
+int semaphore_lock_release(int sem_set_id) {
+    struct sembuf op[1];
+    op[0].sem_op = 1;
+    op[0].sem_num = GLOBAL_LOCK_SEM;
+    op[0].sem_flg = 0;
 
+    return semop(sem_set_id, op, 1);
 }
 
 #endif //CW7_UTILS
