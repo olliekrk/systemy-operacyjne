@@ -9,7 +9,6 @@
 
 int ITEM_WEIGHT = 0;
 int NUMBER_OF_CYCLES = -1; // infinity by default
-int NUMBER_OF_LOADERS = 1; // one by default
 
 int sem_id = -1;
 int belt_id = -1;
@@ -26,6 +25,5 @@ void access_conveyor_belt();
 void access_semaphores();
 
 void interrupt_handler(int);
-
 
 #endif //KROLIKOLGIERD_LOADER_H

@@ -2,13 +2,13 @@
 
 int main(int argc, char **argv) {
     if (argc < 2)
-        show_error("Invalid number of arguments:\n\t<ITEM_WEIGHT> [<NUMBER_OF_LOADERS>] [<NUMBER_OF_CYCLES>]");
+        show_error("Invalid number of arguments:\n\t<ITEM_WEIGHT> [<NUMBER_OF_CYCLES>]");
 
     ITEM_WEIGHT = strtol(argv[1], NULL, 10);
-    if (argc > 2) NUMBER_OF_LOADERS = strtol(argv[2], NULL, 10);
-    if (argc > 3) NUMBER_OF_CYCLES = strtol(argv[3], NULL, 10);
+    if (argc > 2) NUMBER_OF_CYCLES = strtol(argv[2], NULL, 10);
 
     atexit(loader_cleanup);
+    signal(SIGINT, interrupt_handler);
     access_semaphores();
     access_conveyor_belt();
 
