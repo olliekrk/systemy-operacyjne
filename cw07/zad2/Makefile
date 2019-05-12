@@ -4,9 +4,9 @@ build: loader.c trucker.c trucker.h common.h
 	gcc -c trucker.c -o trucker.o
 	gcc -c loader.c -o loader.o
 	gcc -c factory.c -o factory.o
-	gcc trucker.o -o trucker
-	gcc loader.o -o loader
-	gcc factory.o -o factory
+	gcc trucker.o -o trucker -lpthread -lrt
+	gcc loader.o -o loader -lpthread -lrt
+	gcc factory.o -o factory -lpthread -lrt
 
 clean:
 	rm -f loader.o trucker.o factory.o loader trucker factory

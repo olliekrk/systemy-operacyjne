@@ -30,9 +30,11 @@ int trucker_loop(int locking) {
             trucker_unload_truck(locking);
             return 1;
         } else {
-            if (locking) semaphore_item_to_truck(sem_id, item.weight);// lock
+            if (locking) sem_wait(belt_lock_sem); // lock
+            sem_post(belt_cap_sem);
+            for (int i = 0; i < item.weight; i++) sem_post(belt_load_sem);
             trucker_load_truck();
-            if (locking) semaphore_lock_release(sem_id);// unlock
+            if (locking) sem_post(belt_lock_sem);// unlock
             return 1;
         }
     } else {
@@ -42,15 +44,12 @@ int trucker_loop(int locking) {
 }
 
 void trucker_unload_truck(int locking) {
-    // according to the instructions, new packages must not land on the belt if the truck is away
-    if (locking) semaphore_lock_take(sem_id);
-
+    if (locking) sem_wait(belt_lock_sem); // lock
     print_event(generate_event(belt, TRUCK_DEPARTURE));
     sleep(1);
-    print_event(generate_event(belt, TRUCK_ARRIVAL));
     current_truck_load = 0;
-
-    if (locking) semaphore_lock_release(sem_id);
+    print_event(generate_event(belt, TRUCK_ARRIVAL));
+    if (locking) sem_post(belt_lock_sem); // unlock
 }
 
 void trucker_load_truck() {
@@ -74,26 +73,32 @@ void trucker_load_truck() {
 
 void trucker_cleanup() {
     //1.
-    semaphore_set(sem_id, GLOBAL_LOCK_SEM, 0);
+    sem_wait(belt_lock_sem);
 
     //2.
     while (trucker_loop(0) == 1) sleep(1);
 
-    if (semctl(sem_id, 0, IPC_RMID) == -1) fprintf(stderr, "Failed to delete semaphores set\n");
-    if (shmdt(belt) == -1) fprintf(stderr, "Failed to detach belt from process memory\n");
-    if (shmctl(belt_id, IPC_RMID, NULL) == -1) fprintf(stderr, "Failed to delete conveyor belt\n");
+    sem_close(belt_cap_sem);
+    sem_close(belt_load_sem);
+    sem_close(belt_lock_sem);
+
+    munmap(belt, sizeof(conveyor_belt));
+
+    sem_unlink(BELT_CAP_SEM_NAME);
+    sem_unlink(BELT_LOAD_SEM_NAME);
+    sem_unlink(BELT_LOCK_SEM_NAME);
+
+    shm_unlink(BELT_NAME);
 
     printf("Trucker has finished its work.\n");
     exit(0);
 }
 
 void create_conveyor_belt() {
-    key_t belt_key = receive_belt_key();
-
-    belt_id = shmget(belt_key, sizeof(conveyor_belt), CREATION_FLAG);
+    belt_id = shm_open(BELT_NAME, O_RDWR | O_CREAT | O_TRUNC, 0666);
     if (belt_id == -1) show_error("Failed to create conveyor belt");
-
-    belt = shmat(belt_id, NULL, 0);
+    if (ftruncate(belt_id, sizeof(conveyor_belt)) == -1) show_error("Failed to allocate shared memory segment");
+    belt = mmap(NULL, sizeof(conveyor_belt), PROT_READ | PROT_WRITE, MAP_SHARED, belt_id, 0);
     if (belt == (void *) -1) show_error("Failed to attach belt to process memory");
 
     belt->current_cap = 0;
@@ -105,13 +110,16 @@ void create_conveyor_belt() {
 }
 
 void create_semaphores() {
-    key_t sem_key = receive_sem_key();
-    sem_id = semget(sem_key, NUMBER_OF_SEMAPHORES, CREATION_FLAG);
-    if (sem_id == -1) show_error("Failed to create semaphore(s)");
+    belt_cap_sem = sem_open(BELT_CAP_SEM_NAME, O_CREAT, 0666, CONVEYOR_BELT_CAP);
+    belt_load_sem = sem_open(BELT_LOAD_SEM_NAME, O_CREAT, 0666, CONVEYOR_BELT_LOAD);
+    belt_lock_sem = sem_open(BELT_LOCK_SEM_NAME, O_CREAT, 0666, 1);
 
-    semaphore_set(sem_id, BELT_CAP_SEM, CONVEYOR_BELT_CAP);
-    semaphore_set(sem_id, BELT_LOAD_SEM, CONVEYOR_BELT_LOAD);
-    semaphore_set(sem_id, GLOBAL_LOCK_SEM, 1);
+    if (!belt_cap_sem || !belt_load_sem || !belt_lock_sem)
+        show_error("Failed to create semaphore(s)");
+
+    int lock_value;
+    sem_getvalue(belt_lock_sem, &lock_value);
+    printf("created lock value: %d\n", lock_value);
 }
 
 void interrupt_handler(int s) {

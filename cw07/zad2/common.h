@@ -4,22 +4,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <sys/shm.h>
-#include <sys/sem.h>
-#include <sys/ipc.h>
+#include <signal.h>
+#include <fcntl.h>
+#include <semaphore.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/time.h>
-#include <signal.h>
-
-#define SEM_SEED 88
-#define BELT_SEED 99
+#include <sys/mman.h>
 
 #define NUMBER_OF_SEMAPHORES 3
 
-// specific conveyor belt semaphores IDs
-#define BELT_CAP_SEM 0 // capacity left on conveyor belt
-#define BELT_LOAD_SEM 1 // load left on conveyor belt
-#define GLOBAL_LOCK_SEM 2
+#define BELT_CAP_SEM_NAME "/beltCapacitySemaphore"
+#define BELT_LOAD_SEM_NAME "/beltLoadSemaphore"
+#define BELT_LOCK_SEM_NAME "/beltLockSemaphore"
+
+#define BELT_NAME "/conveyorBelt"
 
 // so that items arrays can be static
 #define MAXIMUM_BELT_CAP 500
@@ -90,6 +89,8 @@ char *event_type_name(event_type type) {
             return "LOADER_WAIT";
         case ITEM_LOADED:
             return "ITEM_LOADED";
+        default:
+            return "UNKNOWN";
     }
 }
 
@@ -127,90 +128,7 @@ void belt_pop(conveyor_belt *belt) {
 void belt_push(conveyor_belt *belt, belt_item item) {
     belt->items[belt->current_cap] = item;
     belt->current_load += item.weight;
-    belt->current_cap += 1;
-}
-
-// for generating keys
-key_t receive_key(int id) {
-    char *home_path = getenv("HOME");
-    if (!home_path) show_error("$HOME is unavailable");
-
-    key_t generated_key = ftok(home_path, id);
-    if (generated_key == -1) show_error("Unable to generate key.");
-
-    return generated_key;
-}
-
-key_t receive_sem_key() {
-    return receive_key(SEM_SEED);
-}
-
-key_t receive_belt_key() {
-    return receive_key(BELT_SEED);
-}
-
-// for managing semaphores
-void semaphore_set(int sem_set_id, int sem_id, int value) {
-    if (semctl(sem_set_id, sem_id, SETVAL, value) == -1)
-        show_error("Failed to set semaphore value");
-}
-
-int semaphore_get(int sem_set_id, int sem_id) {
-    return semctl(sem_set_id, sem_id, GETVAL);
-}
-
-int semaphore_item_to_truck(int sem_set_id, int item_weight) {
-    struct sembuf ops[3];
-
-    ops[0].sem_op = item_weight;
-    ops[0].sem_num = BELT_LOAD_SEM;
-    ops[0].sem_flg = 0;
-
-    ops[1].sem_op = 1;
-    ops[1].sem_num = BELT_CAP_SEM;
-    ops[1].sem_flg = 0;
-
-    ops[2].sem_op = -1;
-    ops[2].sem_num = GLOBAL_LOCK_SEM;
-    ops[2].sem_flg = 0;
-
-    return semop(sem_set_id, ops, 3);
-}
-
-int semaphore_item_to_belt(int sem_set_id, int item_weight) {
-    struct sembuf ops[3];
-
-    ops[0].sem_op = -item_weight;
-    ops[0].sem_num = BELT_LOAD_SEM;
-    ops[0].sem_flg = IPC_NOWAIT;
-
-    ops[1].sem_op = -1;
-    ops[1].sem_num = BELT_CAP_SEM;
-    ops[1].sem_flg = IPC_NOWAIT;
-
-    ops[2].sem_op = -1;
-    ops[2].sem_num = GLOBAL_LOCK_SEM;
-    ops[2].sem_flg = IPC_NOWAIT;
-
-    return semop(sem_set_id, ops, 3);
-}
-
-int semaphore_lock_take(int sem_set_id) {
-    struct sembuf op[1];
-    op[0].sem_op = -1;
-    op[0].sem_num = GLOBAL_LOCK_SEM;
-    op[0].sem_flg = 0;
-
-    return semop(sem_set_id, op, 1);
-}
-
-int semaphore_lock_release(int sem_set_id) {
-    struct sembuf op[1];
-    op[0].sem_op = 1;
-    op[0].sem_num = GLOBAL_LOCK_SEM;
-    op[0].sem_flg = 0;
-
-    return semop(sem_set_id, op, 1);
+    belt->current_cap ++;
 }
 
 #endif //CW7_UTILS
