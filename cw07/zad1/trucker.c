@@ -17,45 +17,42 @@ int main(int argc, char **argv) {
 
     while (belt) {
         trucker_loop(1);
-        sleep(1);
+        sleep(1); // comment to let trucker work non-stop
     }
 
     exit(3);
 }
 
 int trucker_loop(int locking) {
-    if (belt->current_cap > 0) {
-        belt_item item = belt_peek(belt);
-        if (item.weight + current_truck_load > TRUCK_LOAD) {
-            trucker_unload_truck(locking);
-            return 1;
-        } else {
-            if (locking) semaphore_item_to_truck(sem_id, item.weight);// lock
-            trucker_load_truck();
-            if (locking) semaphore_lock_release(sem_id);// unlock
-            return 1;
-        }
-    } else {
+    if (belt->current_cap == 0) {
         print_event(generate_event(belt, TRUCK_WAIT));
         return 0;
     }
+
+    belt_item item = belt_peek(belt);
+    if (locking) semaphore_lock_take(sem_id); // lock
+
+    if (item.weight + current_truck_load > TRUCK_LOAD) trucker_unload_truck();
+    else trucker_load_truck();
+
+    if (locking) semaphore_lock_release(sem_id);// unlock
+    return 1;
 }
 
-void trucker_unload_truck(int locking) {
-    // according to the instructions, new packages must not land on the belt if the truck is away
-    if (locking) semaphore_lock_take(sem_id);
-
+void trucker_unload_truck() {
     print_event(generate_event(belt, TRUCK_DEPARTURE));
     sleep(1);
-    print_event(generate_event(belt, TRUCK_ARRIVAL));
     current_truck_load = 0;
-
-    if (locking) semaphore_lock_release(sem_id);
+    print_event(generate_event(belt, TRUCK_ARRIVAL));
 }
 
 void trucker_load_truck() {
+    // shared memory operations
     belt_item item = belt_peek(belt);
     belt_pop(belt);
+
+    //semaphores operations
+    semaphore_item_to_truck(sem_id, item.weight);
 
     current_truck_load += item.weight;
 
@@ -69,7 +66,9 @@ void trucker_load_truck() {
 
     tv diff;
     timersub(&event.time, &item.time, &diff);
-    printf("\tCURRENT TRUCK LOAD: %d\n\tTIME ON BELT: %ld s\t%ld ms\n", current_truck_load, diff.tv_sec, diff.tv_usec);
+    printf("\tCURRENT TRUCK LOAD: %d\n"
+           "\tTIME ON BELT: %ld s\t%ld us\n",
+           current_truck_load, diff.tv_sec, diff.tv_usec);
 }
 
 void trucker_cleanup() {
@@ -88,9 +87,7 @@ void trucker_cleanup() {
 }
 
 void create_conveyor_belt() {
-    key_t belt_key = receive_belt_key();
-
-    belt_id = shmget(belt_key, sizeof(conveyor_belt), CREATION_FLAG);
+    belt_id = shmget(receive_belt_key(), sizeof(conveyor_belt), CREATION_FLAG);
     if (belt_id == -1) show_error("Failed to create conveyor belt");
 
     belt = shmat(belt_id, NULL, 0);
@@ -100,8 +97,7 @@ void create_conveyor_belt() {
     belt->current_load = 0;
 
     // initialize with event of truck arrival
-    belt_event *init_event = generate_event(belt, TRUCK_ARRIVAL);
-    print_event(init_event);
+    print_event(generate_event(belt, TRUCK_ARRIVAL));
 }
 
 void create_semaphores() {
@@ -112,6 +108,7 @@ void create_semaphores() {
     semaphore_set(sem_id, BELT_CAP_SEM, CONVEYOR_BELT_CAP);
     semaphore_set(sem_id, BELT_LOAD_SEM, CONVEYOR_BELT_LOAD);
     semaphore_set(sem_id, GLOBAL_LOCK_SEM, 1);
+    semaphore_set(sem_id, LOADERS_SEM, 1);
 }
 
 void interrupt_handler(int s) {

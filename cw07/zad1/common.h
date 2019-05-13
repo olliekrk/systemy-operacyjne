@@ -14,12 +14,13 @@
 #define SEM_SEED 88
 #define BELT_SEED 99
 
-#define NUMBER_OF_SEMAPHORES 3
+#define NUMBER_OF_SEMAPHORES 4
 
 // specific conveyor belt semaphores IDs
 #define BELT_CAP_SEM 0 // capacity left on conveyor belt
 #define BELT_LOAD_SEM 1 // load left on conveyor belt
-#define GLOBAL_LOCK_SEM 2
+#define GLOBAL_LOCK_SEM 2 // conveyor belt lock
+#define LOADERS_SEM 3 // loaders item put privilege lock
 
 // so that items arrays can be static
 #define MAXIMUM_BELT_CAP 500
@@ -94,13 +95,11 @@ char *event_type_name(event_type type) {
 }
 
 void print_event(belt_event *event) {
-    printf("EVENT: %s\n\t"
-           "TIME: %ld s\t%ld ms\n\t"
-           "PID: %d\n\t"
-           "CURRENT BELT LOAD: %d kg\tCURRENT BELT CAP: %d items\n",
+    printf("EVENT: %s\n"
+           "\tPID: %d\n"
+           "\tCURRENT BELT LOAD: %d kg\t"
+           "CURRENT BELT CAP: %d items\n",
            event_type_name(event->type),
-           event->time.tv_sec,
-           event->time.tv_usec,
            event->pid,
            event->current_cb_load,
            event->current_cb_cap);
@@ -160,7 +159,7 @@ int semaphore_get(int sem_set_id, int sem_id) {
 }
 
 int semaphore_item_to_truck(int sem_set_id, int item_weight) {
-    struct sembuf ops[3];
+    struct sembuf ops[2];
 
     ops[0].sem_op = item_weight;
     ops[0].sem_num = BELT_LOAD_SEM;
@@ -170,11 +169,7 @@ int semaphore_item_to_truck(int sem_set_id, int item_weight) {
     ops[1].sem_num = BELT_CAP_SEM;
     ops[1].sem_flg = 0;
 
-    ops[2].sem_op = -1;
-    ops[2].sem_num = GLOBAL_LOCK_SEM;
-    ops[2].sem_flg = 0;
-
-    return semop(sem_set_id, ops, 3);
+    return semop(sem_set_id, ops, 2);
 }
 
 int semaphore_item_to_belt(int sem_set_id, int item_weight) {
@@ -182,15 +177,15 @@ int semaphore_item_to_belt(int sem_set_id, int item_weight) {
 
     ops[0].sem_op = -item_weight;
     ops[0].sem_num = BELT_LOAD_SEM;
-    ops[0].sem_flg = IPC_NOWAIT;
+    ops[0].sem_flg = 0;
 
     ops[1].sem_op = -1;
     ops[1].sem_num = BELT_CAP_SEM;
-    ops[1].sem_flg = IPC_NOWAIT;
+    ops[1].sem_flg = 0;
 
     ops[2].sem_op = -1;
     ops[2].sem_num = GLOBAL_LOCK_SEM;
-    ops[2].sem_flg = IPC_NOWAIT;
+    ops[2].sem_flg = 0;
 
     return semop(sem_set_id, ops, 3);
 }
@@ -208,6 +203,24 @@ int semaphore_lock_release(int sem_set_id) {
     struct sembuf op[1];
     op[0].sem_op = 1;
     op[0].sem_num = GLOBAL_LOCK_SEM;
+    op[0].sem_flg = 0;
+
+    return semop(sem_set_id, op, 1);
+}
+
+int semaphore_privilege_take(int sem_set_id) {
+    struct sembuf op[1];
+    op[0].sem_op = -1;
+    op[0].sem_num = LOADERS_SEM;
+    op[0].sem_flg = 0;
+
+    return semop(sem_set_id, op, 1);
+}
+
+int semaphore_privilege_release(int sem_set_id) {
+    struct sembuf op[1];
+    op[0].sem_op = 1;
+    op[0].sem_num = LOADERS_SEM;
     op[0].sem_flg = 0;
 
     return semop(sem_set_id, op, 1);

@@ -18,4 +18,4 @@ run_loader:
 	./loader 10
 
 run_factory:
-	./factory 3 100
+	./factory 3 10 100

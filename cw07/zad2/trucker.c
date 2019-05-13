@@ -83,14 +83,12 @@ void trucker_cleanup() {
     sem_close(belt_lock_sem);
     sem_close(belt_cap_sem);
     sem_close(belt_load_sem);
-
-    munmap(belt, sizeof(conveyor_belt));
-
     sem_unlink(LOADERS_SEM_NAME);
     sem_unlink(BELT_LOCK_SEM_NAME);
     sem_unlink(BELT_CAP_SEM_NAME);
     sem_unlink(BELT_LOAD_SEM_NAME);
 
+    munmap(belt, sizeof(conveyor_belt));
     shm_unlink(BELT_NAME);
 
     printf("Trucker has finished its work.\n");
@@ -108,8 +106,7 @@ void create_conveyor_belt() {
     belt->current_load = 0;
 
     // initialize with event of truck arrival
-    belt_event *init_event = generate_event(belt, TRUCK_ARRIVAL);
-    print_event(init_event);
+    print_event(generate_event(belt, TRUCK_ARRIVAL));
 }
 
 void create_semaphores() {

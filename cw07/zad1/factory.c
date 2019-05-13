@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < number_of_loaders; i++) {
         pid_t loader = fork();
         if (loader == 0) {
-            execl("./loader", "loader", item_weight, number_of_cycles, (char *) NULL);
+            execl("loader", "loader", item_weight, number_of_cycles, (char *) NULL);
             return 0;
         } else {
             printf("Starting loader no. %d with PID %d\n", i, loader);
