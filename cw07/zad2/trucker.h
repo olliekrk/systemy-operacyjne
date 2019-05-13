@@ -16,6 +16,7 @@ int CONVEYOR_BELT_LOAD = 0;
 sem_t *belt_cap_sem = NULL;
 sem_t *belt_load_sem = NULL;
 sem_t *belt_lock_sem = NULL;
+sem_t *loaders_sem = NULL;
 
 int belt_id = -1;
 conveyor_belt *belt = NULL;

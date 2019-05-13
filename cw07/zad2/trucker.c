@@ -8,7 +8,7 @@ int main(int argc, char **argv) {
     CONVEYOR_BELT_LOAD = strtol(argv[2], NULL, 10);
     CONVEYOR_BELT_CAP = strtol(argv[3], NULL, 10);
     if (CONVEYOR_BELT_CAP > MAXIMUM_BELT_CAP)
-        show_error("Conveyor belt maximum capacity is exceeded");
+        show_error("Conveyor belt maximum capacity cannot be exceeded");
 
     atexit(trucker_cleanup);
     signal(SIGINT, interrupt_handler);
@@ -17,32 +17,26 @@ int main(int argc, char **argv) {
 
     while (belt) {
         trucker_loop(1);
-        sleep(1);
+        sleep(1); // comment to let trucker work non-stop
     }
 
     exit(3);
 }
 
 int trucker_loop(int locking) {
-    if (belt->current_cap > 0) {
-        belt_item item = belt_peek(belt);
-        if (item.weight + current_truck_load > TRUCK_LOAD) {
-            if (locking) sem_wait(belt_lock_sem); // lock
-            trucker_unload_truck();
-            if (locking) sem_post(belt_lock_sem); // unlock
-        } else {
-            if (locking) sem_wait(belt_lock_sem); // lock
-            sem_post(belt_cap_sem);
-            for (int i = 0; i < item.weight; i++) sem_post(belt_load_sem);
-            trucker_load_truck();
-            if (locking) sem_post(belt_lock_sem);// unlock
-            return 1;
-        }
-        return 1;
-    } else {
+    if (belt->current_cap == 0) {
         print_event(generate_event(belt, TRUCK_WAIT));
         return 0;
     }
+
+    belt_item item = belt_peek(belt);
+    if (locking) sem_wait(belt_lock_sem); // lock
+
+    if (item.weight + current_truck_load > TRUCK_LOAD) trucker_unload_truck();
+    else trucker_load_truck();
+
+    if (locking) sem_post(belt_lock_sem); // unlock
+    return 1;
 }
 
 void trucker_unload_truck() {
@@ -53,8 +47,13 @@ void trucker_unload_truck() {
 }
 
 void trucker_load_truck() {
+    // shared memory operations
     belt_item item = belt_peek(belt);
     belt_pop(belt);
+
+    // semaphores operations
+    sem_post(belt_cap_sem);
+    for (int i = 0; i < item.weight; i++) sem_post(belt_load_sem);
 
     current_truck_load += item.weight;
 
@@ -68,7 +67,9 @@ void trucker_load_truck() {
 
     tv diff;
     timersub(&event.time, &item.time, &diff);
-    printf("\tCURRENT TRUCK LOAD: %d\n\tTIME ON BELT: %ld s\t%ld ms\n", current_truck_load, diff.tv_sec, diff.tv_usec);
+    printf("\tCURRENT TRUCK LOAD: %d\n"
+           "\tTIME ON BELT: %ld s\t%ld us\n",
+           current_truck_load, diff.tv_sec, diff.tv_usec);
 }
 
 void trucker_cleanup() {
@@ -78,15 +79,17 @@ void trucker_cleanup() {
     //2.
     while (trucker_loop(0) == 1) sleep(1);
 
+    sem_close(loaders_sem);
+    sem_close(belt_lock_sem);
     sem_close(belt_cap_sem);
     sem_close(belt_load_sem);
-    sem_close(belt_lock_sem);
 
     munmap(belt, sizeof(conveyor_belt));
 
+    sem_unlink(LOADERS_SEM_NAME);
+    sem_unlink(BELT_LOCK_SEM_NAME);
     sem_unlink(BELT_CAP_SEM_NAME);
     sem_unlink(BELT_LOAD_SEM_NAME);
-    sem_unlink(BELT_LOCK_SEM_NAME);
 
     shm_unlink(BELT_NAME);
 
@@ -113,13 +116,10 @@ void create_semaphores() {
     belt_cap_sem = sem_open(BELT_CAP_SEM_NAME, O_CREAT, 0666, CONVEYOR_BELT_CAP);
     belt_load_sem = sem_open(BELT_LOAD_SEM_NAME, O_CREAT, 0666, CONVEYOR_BELT_LOAD);
     belt_lock_sem = sem_open(BELT_LOCK_SEM_NAME, O_CREAT, 0666, 1);
+    loaders_sem = sem_open(LOADERS_SEM_NAME, O_CREAT, 0666, 1);
 
-    if (!belt_cap_sem || !belt_load_sem || !belt_lock_sem)
+    if (!belt_cap_sem || !belt_load_sem || !belt_lock_sem || !loaders_sem)
         show_error("Failed to create semaphore(s)");
-
-    int lock_value;
-    sem_getvalue(belt_lock_sem, &lock_value);
-    printf("created lock value: %d\n", lock_value);
 }
 
 void interrupt_handler(int s) {

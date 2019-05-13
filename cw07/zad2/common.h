@@ -17,10 +17,11 @@
 #define BELT_CAP_SEM_NAME "/beltCapacitySemaphore"
 #define BELT_LOAD_SEM_NAME "/beltLoadSemaphore"
 #define BELT_LOCK_SEM_NAME "/beltLockSemaphore"
+#define LOADERS_SEM_NAME "loadersSemaphore"
 
 #define BELT_NAME "/conveyorBelt"
 
-// so that items arrays can be static
+// so that items array can be static
 #define MAXIMUM_BELT_CAP 500
 
 // data structures
@@ -95,19 +96,17 @@ char *event_type_name(event_type type) {
 }
 
 void print_event(belt_event *event) {
-    printf("EVENT: %s\n\t"
-           "TIME: %ld s\t%ld ms\n\t"
-           "PID: %d\n\t"
-           "CURRENT BELT LOAD: %d kg\tCURRENT BELT CAP: %d items\n",
+    printf("EVENT: %s\n"
+           "\tEVENT FROM PID: %d\n"
+           "\tCURRENT BELT LOAD: %d kg"
+           "\tCURRENT BELT CAP: %d items\n",
            event_type_name(event->type),
-           event->time.tv_sec,
-           event->time.tv_usec,
            event->pid,
            event->current_cb_load,
            event->current_cb_cap);
 }
 
-// for conveyor belt operations (cancerous)
+// for conveyor belt operations (super cancerous)
 belt_item belt_peek(conveyor_belt *belt) {
     return belt->items[0];
 }
@@ -128,7 +127,7 @@ void belt_pop(conveyor_belt *belt) {
 void belt_push(conveyor_belt *belt, belt_item item) {
     belt->items[belt->current_cap] = item;
     belt->current_load += item.weight;
-    belt->current_cap ++;
+    belt->current_cap++;
 }
 
 #endif //CW7_UTILS
