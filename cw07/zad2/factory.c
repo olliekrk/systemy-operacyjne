@@ -29,12 +29,14 @@ void interrupt_handler(int sig) {
 }
 
 int main(int argc, char **argv) {
-    if (argc < 2)
-        show_error("Invalid number of arguments:\n\t<NUMBER_OF_LOADERS> [<NUMBER_OF_CYCLES>]");
+    if (argc < 3)
+        show_error("Invalid number of arguments:\n\t<NUMBER_OF_LOADERS> <LOADER_ITEM_WEIGHT> [<NUMBER_OF_CYCLES>]");
+
+    number_of_loaders = strtol(argv[1], NULL, 10);
+    int item_weight = strtol(argv[2], NULL, 10);
 
     int number_of_cycles = -1;
-    number_of_loaders = strtol(argv[1], NULL, 10);
-    if (argc > 2) number_of_cycles = strtol(argv[2], NULL, 10);
+    if (argc > 3) number_of_cycles = strtol(argv[3], NULL, 10);
 
     char *cycles_arg = calloc(10, sizeof(char));
     sprintf(cycles_arg, "%d", number_of_cycles);
@@ -46,7 +48,7 @@ int main(int argc, char **argv) {
     for (int i = 0; i < number_of_loaders; i++) {
         pid_t loader = fork();
         if (loader == 0) {
-            execl("./loader", "loader", cycles_arg, (char *) NULL);
+            execl("./loader", "loader", item_weight, number_of_cycles, (char *) NULL);
             return 0;
         } else {
             printf("Starting loader no. %d with PID %d\n", i, loader);
@@ -55,6 +57,5 @@ int main(int argc, char **argv) {
     }
 
     while (loaders) pause();
-
     return 0;
 }
