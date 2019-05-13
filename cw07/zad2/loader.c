@@ -35,10 +35,12 @@ void loader_loop() {
         print_event(generate_event(belt, LOADER_WAIT));
         get_current_time(&wait_start);
 
-        sem_wait(loaders_sem); // lock the privilege to put the item
+        while (sem_trywait(loaders_sem) == -1) // lock the privilege to put the item
+            check_shutdown_sem();
 
         for (item_placed = 0; item_placed == 0;) {
-            sem_wait(belt_lock_sem); // lock the belt
+            while (sem_trywait(belt_lock_sem) == -1) // lock the belt
+                check_shutdown_sem();
 
             sem_getvalue(belt_cap_sem, &belt_cap);
             sem_getvalue(belt_load_sem, &belt_load);
@@ -77,6 +79,7 @@ void loader_cleanup() {
     sem_close(belt_load_sem);
     sem_close(belt_lock_sem);
     sem_close(loaders_sem);
+    sem_close(shutdown_sem);
     munmap(belt, sizeof(conveyor_belt));
     printf("Loader has finished its work.\n");
     exit(0);
@@ -95,9 +98,16 @@ void access_semaphores() {
     belt_load_sem = sem_open(BELT_LOAD_SEM_NAME, 0);
     belt_lock_sem = sem_open(BELT_LOCK_SEM_NAME, 0);
     loaders_sem = sem_open(LOADERS_SEM_NAME, 0);
+    shutdown_sem = sem_open(SHUTDOWN_SEM_NAME, 0);
 
-    if (!belt_cap_sem || !belt_load_sem || !belt_lock_sem || !loaders_sem)
+    if (!belt_cap_sem || !belt_load_sem || !belt_lock_sem || !loaders_sem || !shutdown_sem)
         show_error("Failed to access semaphore(s)");
+}
+
+void check_shutdown_sem() {
+    int shutdown = 0;
+    sem_getvalue(shutdown_sem, &shutdown);
+    if (shutdown == 1) exit(3);
 }
 
 void interrupt_handler(int s) {

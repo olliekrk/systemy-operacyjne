@@ -10,7 +10,7 @@
 #define CREATION_FLAG IPC_CREAT | 0666 /*| IPC_EXCL*/
 
 // truck related
-int current_truck_load;
+int CURRENT_TRUCK_LOAD;
 int TRUCK_LOAD = 0;
 
 // belt related

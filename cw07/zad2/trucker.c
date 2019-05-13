@@ -1,5 +1,6 @@
 #include "trucker.h"
 
+
 int main(int argc, char **argv) {
     if (argc < 4)
         show_error("Invalid number of arguments:\n\t<TRUCK_LOAD> <BELT_LOAD> <BELT_CAP>");
@@ -31,18 +32,21 @@ int trucker_loop(int locking) {
 
     belt_item item = belt_peek(belt);
     if (locking) sem_wait(belt_lock_sem); // lock
+    LOCK_IS_MINE = 1;
 
-    if (item.weight + current_truck_load > TRUCK_LOAD) trucker_unload_truck();
+    if (item.weight + CURRENT_TRUCK_LOAD > TRUCK_LOAD) trucker_unload_truck();
     else trucker_load_truck();
 
     if (locking) sem_post(belt_lock_sem); // unlock
+    LOCK_IS_MINE = 0;
+
     return 1;
 }
 
 void trucker_unload_truck() {
     print_event(generate_event(belt, TRUCK_DEPARTURE));
     sleep(1);
-    current_truck_load = 0;
+    CURRENT_TRUCK_LOAD = 0;
     print_event(generate_event(belt, TRUCK_ARRIVAL));
 }
 
@@ -55,7 +59,7 @@ void trucker_load_truck() {
     sem_post(belt_cap_sem);
     for (int i = 0; i < item.weight; i++) sem_post(belt_load_sem);
 
-    current_truck_load += item.weight;
+    CURRENT_TRUCK_LOAD += item.weight;
 
     belt_event event;
     event.type = TRUCK_LOADING;
@@ -69,24 +73,29 @@ void trucker_load_truck() {
     timersub(&event.time, &item.time, &diff);
     printf("\tCURRENT TRUCK LOAD: %d\n"
            "\tTIME ON BELT: %ld s\t%ld us\n",
-           current_truck_load, diff.tv_sec, diff.tv_usec);
+           CURRENT_TRUCK_LOAD, diff.tv_sec, diff.tv_usec);
 }
 
 void trucker_cleanup() {
-    //1.
-    sem_wait(belt_lock_sem);
+    //1. In POSIX we need to be sure that trucker owns the lock
+    if (LOCK_IS_MINE == 0) sem_wait(belt_lock_sem);
 
-    //2.
+    //2. Unload everything when the belt is locked
     while (trucker_loop(0) == 1) sleep(1);
+
+    //3. Notify loaders to close their semaphores
+    sem_post(shutdown_sem);
 
     sem_close(loaders_sem);
     sem_close(belt_lock_sem);
     sem_close(belt_cap_sem);
     sem_close(belt_load_sem);
+    sem_close(shutdown_sem);
     sem_unlink(LOADERS_SEM_NAME);
     sem_unlink(BELT_LOCK_SEM_NAME);
     sem_unlink(BELT_CAP_SEM_NAME);
     sem_unlink(BELT_LOAD_SEM_NAME);
+    sem_unlink(SHUTDOWN_SEM_NAME);
 
     munmap(belt, sizeof(conveyor_belt));
     shm_unlink(BELT_NAME);
@@ -114,8 +123,9 @@ void create_semaphores() {
     belt_load_sem = sem_open(BELT_LOAD_SEM_NAME, O_CREAT, 0666, CONVEYOR_BELT_LOAD);
     belt_lock_sem = sem_open(BELT_LOCK_SEM_NAME, O_CREAT, 0666, 1);
     loaders_sem = sem_open(LOADERS_SEM_NAME, O_CREAT, 0666, 1);
+    shutdown_sem = sem_open(SHUTDOWN_SEM_NAME, O_CREAT, 0666, 0);
 
-    if (!belt_cap_sem || !belt_load_sem || !belt_lock_sem || !loaders_sem)
+    if (!belt_cap_sem || !belt_load_sem || !belt_lock_sem || !loaders_sem || !shutdown_sem)
         show_error("Failed to create semaphore(s)");
 }
 

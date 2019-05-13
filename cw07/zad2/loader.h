@@ -14,6 +14,7 @@ sem_t *belt_cap_sem = NULL;
 sem_t *belt_load_sem = NULL;
 sem_t *belt_lock_sem = NULL;
 sem_t *loaders_sem = NULL;
+sem_t *shutdown_sem = NULL;
 
 int belt_id = -1;
 conveyor_belt *belt = NULL;
@@ -27,6 +28,8 @@ void loader_cleanup();
 void access_conveyor_belt();
 
 void access_semaphores();
+
+void check_shutdown_sem();
 
 void interrupt_handler(int);
 

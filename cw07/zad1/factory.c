@@ -49,12 +49,9 @@ int main(int argc, char **argv) {
         if (loader == 0) {
             if (execlp("./loader", "loader", argv[2], cycles, NULL) == -1)
                 show_error("Failed to initialize loader(s)");
-            return 0;
         } else {
             printf("Starting loader no. %d with PID %d\n", i, loader);
             loaders[i] = loader;
         }
     }
-
-    while (1);
 }

@@ -32,7 +32,7 @@ int trucker_loop(int locking) {
     belt_item item = belt_peek(belt);
     if (locking) semaphore_lock_take(sem_id); // lock
 
-    if (item.weight + current_truck_load > TRUCK_LOAD) trucker_unload_truck();
+    if (item.weight + CURRENT_TRUCK_LOAD > TRUCK_LOAD) trucker_unload_truck();
     else trucker_load_truck();
 
     if (locking) semaphore_lock_release(sem_id);// unlock
@@ -42,7 +42,7 @@ int trucker_loop(int locking) {
 void trucker_unload_truck() {
     print_event(generate_event(belt, TRUCK_DEPARTURE));
     sleep(1);
-    current_truck_load = 0;
+    CURRENT_TRUCK_LOAD = 0;
     print_event(generate_event(belt, TRUCK_ARRIVAL));
 }
 
@@ -54,7 +54,7 @@ void trucker_load_truck() {
     //semaphores operations
     semaphore_item_to_truck(sem_id, item.weight);
 
-    current_truck_load += item.weight;
+    CURRENT_TRUCK_LOAD += item.weight;
 
     belt_event event;
     event.type = TRUCK_LOADING;
@@ -68,7 +68,7 @@ void trucker_load_truck() {
     timersub(&event.time, &item.time, &diff);
     printf("\tCURRENT TRUCK LOAD: %d\n"
            "\tTIME ON BELT: %ld s\t%ld us\n",
-           current_truck_load, diff.tv_sec, diff.tv_usec);
+           CURRENT_TRUCK_LOAD, diff.tv_sec, diff.tv_usec);
 }
 
 void trucker_cleanup() {

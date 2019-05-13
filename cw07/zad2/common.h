@@ -12,12 +12,11 @@
 #include <sys/time.h>
 #include <sys/mman.h>
 
-#define NUMBER_OF_SEMAPHORES 3
-
 #define BELT_CAP_SEM_NAME "/beltCapacitySemaphore"
 #define BELT_LOAD_SEM_NAME "/beltLoadSemaphore"
 #define BELT_LOCK_SEM_NAME "/beltLockSemaphore"
-#define LOADERS_SEM_NAME "loadersSemaphore"
+#define LOADERS_SEM_NAME "/loadersSemaphore"
+#define SHUTDOWN_SEM_NAME "/shutdownSemaphore"
 
 #define BELT_NAME "/conveyorBelt"
 
