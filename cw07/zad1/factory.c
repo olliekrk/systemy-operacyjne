@@ -33,13 +33,12 @@ int main(int argc, char **argv) {
         show_error("Invalid number of arguments:\n\t<NUMBER_OF_LOADERS> <LOADER_ITEM_WEIGHT> [<NUMBER_OF_CYCLES>]");
 
     number_of_loaders = strtol(argv[1], NULL, 10);
-    int item_weight = strtol(argv[2], NULL, 10);
 
     int number_of_cycles = -1;
     if (argc > 3) number_of_cycles = strtol(argv[3], NULL, 10);
-
-    char *cycles_arg = calloc(10, sizeof(char));
-    sprintf(cycles_arg, "%d", number_of_cycles);
+    char *cycles;
+    if (number_of_cycles == -1) cycles = "-1";
+    else cycles = argv[3];
 
     signal(SIGINT, interrupt_handler);
     atexit(cleanup);
@@ -48,7 +47,8 @@ int main(int argc, char **argv) {
     for (int i = 0; i < number_of_loaders; i++) {
         pid_t loader = fork();
         if (loader == 0) {
-            execl("loader", "loader", item_weight, number_of_cycles, (char *) NULL);
+            if (execlp("./loader", "loader", argv[2], cycles, NULL) == -1)
+                show_error("Failed to initialize loader(s)");
             return 0;
         } else {
             printf("Starting loader no. %d with PID %d\n", i, loader);
@@ -56,6 +56,5 @@ int main(int argc, char **argv) {
         }
     }
 
-    while (loaders) pause();
-    return 0;
+    while (1);
 }
