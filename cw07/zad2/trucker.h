@@ -22,7 +22,7 @@ conveyor_belt *belt = NULL;
 
 int trucker_loop(int);
 
-void trucker_unload_truck(int);
+void trucker_unload_truck();
 
 void trucker_load_truck();
 

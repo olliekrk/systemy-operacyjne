@@ -25,12 +25,12 @@ void loader_loop() {
     int was_waiting = 0; // to reduce frequency of printing 'WAIT' events
     int belt_cap = 0;
     int belt_load = 0;
+    int belt_lock = 0;
 
     while (abs(NUMBER_OF_CYCLES) > 0) {
         if (sem_trywait(belt_lock_sem) == 0) { // lock
             sem_getvalue(belt_cap_sem, &belt_cap);
             sem_getvalue(belt_load_sem, &belt_load);
-            printf("seg fault1\n");
             if (belt_cap > 0 && belt_load >= ITEM_WEIGHT) {
                 sem_wait(belt_cap_sem);
                 for (int i = 0; i < ITEM_WEIGHT; i++) sem_wait(belt_load_sem);
@@ -38,13 +38,13 @@ void loader_loop() {
                 was_waiting = 0;
                 sleep(1);
             }
-            printf("seg fault2\n");
             sem_post(belt_lock_sem); // unlock
         } else {
-            if (sem_getvalue(belt_lock_sem, NULL) == -1) exit(3);
+            if (sem_getvalue(belt_lock_sem, &belt_lock) == -1) exit(3);
             if (was_waiting == 0) print_event(generate_event(belt, LOADER_WAIT));
             was_waiting = 1;
         }
+        sleep(1);
     }
 
 }

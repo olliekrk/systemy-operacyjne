@@ -27,8 +27,9 @@ int trucker_loop(int locking) {
     if (belt->current_cap > 0) {
         belt_item item = belt_peek(belt);
         if (item.weight + current_truck_load > TRUCK_LOAD) {
-            trucker_unload_truck(locking);
-            return 1;
+            if (locking) sem_wait(belt_lock_sem); // lock
+            trucker_unload_truck();
+            if (locking) sem_post(belt_lock_sem); // unlock
         } else {
             if (locking) sem_wait(belt_lock_sem); // lock
             sem_post(belt_cap_sem);
@@ -37,19 +38,18 @@ int trucker_loop(int locking) {
             if (locking) sem_post(belt_lock_sem);// unlock
             return 1;
         }
+        return 1;
     } else {
         print_event(generate_event(belt, TRUCK_WAIT));
         return 0;
     }
 }
 
-void trucker_unload_truck(int locking) {
-    if (locking) sem_wait(belt_lock_sem); // lock
+void trucker_unload_truck() {
     print_event(generate_event(belt, TRUCK_DEPARTURE));
     sleep(1);
     current_truck_load = 0;
     print_event(generate_event(belt, TRUCK_ARRIVAL));
-    if (locking) sem_post(belt_lock_sem); // unlock
 }
 
 void trucker_load_truck() {
