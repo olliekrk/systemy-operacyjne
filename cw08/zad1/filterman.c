@@ -4,15 +4,66 @@
 
 #define TIMES_FILE_NAME "times.txt"
 
-void *block_filtering(void *);
-
-void *interleaved_filtering(void *);
-
 pthread_t *THREADS;
 int THREADS_NO;
 
 PGMImage *image, *output;
 Filter *filter;
+
+void *block_filtering(void *thread_no) {
+    int *kp = (int *) thread_no;
+    int k = *kp;
+    int c = ceil((double) image->columns / THREADS_NO);
+
+    int start_x = (k - 1) * c;
+    int end_x = k * c;
+    int index;
+
+    tv time_start, time_end, diff;
+    get_current_time(&time_start);
+
+    for (int x = start_x; x < end_x; x++)
+        for (int row = 0; row < image->rows; row++) {
+            index = row * image->columns + x;
+            output->matrix[index] = (int) round(s_filter(image, filter, row, x));
+        }
+
+    get_current_time(&time_end);
+    diff = get_time_difference(&time_start, &time_end);
+
+    tv *diff_pointer = malloc(sizeof(tv));
+    diff_pointer->tv_sec = diff.tv_sec;
+    diff_pointer->tv_usec = diff.tv_usec;
+
+    free(kp);
+    pthread_exit(diff_pointer);
+}
+
+void *interleaved_filtering(void *thread_no) {
+    int *kp = (int *) thread_no;
+    int k = *kp;
+    int index;
+
+    tv time_start, time_end, diff;
+    get_current_time(&time_start);
+
+    for (int x = k - 1; x < image->columns; x += THREADS_NO)
+        for (int row = 0; row < image->rows; row++) {
+            index = row * image->columns + x;
+            output->matrix[index] = (int) round(s_filter(image, filter, row, x));
+        }
+
+
+    get_current_time(&time_end);
+    diff = get_time_difference(&time_start, &time_end);
+
+    tv *diff_pointer = malloc(sizeof(tv));
+    diff_pointer->tv_sec = diff.tv_sec;
+    diff_pointer->tv_usec = diff.tv_usec;
+
+    free(kp);
+    pthread_exit(diff_pointer);
+}
 
 int main(int argc, char **argv) {
     if (argc < 6)
@@ -58,43 +109,40 @@ int main(int argc, char **argv) {
     if (filtering_function == NULL)
         show_error("Invalid filtering function");
 
+    tv time_a, time_b;
     tv total_time;
-    tv time_a, time_b, diff;
+    tv total_time_threads = {0, 0};
+
+    get_current_time(&time_a);
 
     // running threads
     for (int i = 1; i <= THREADS_NO; i++) {
         int *k = calloc(1, sizeof(int));
         *k = i;
-
-        get_current_time(&time_a);
         if (pthread_create(&THREADS[i - 1], NULL, filtering_function, k)) show_error("Failed to create thread(s)");
-        get_current_time(&time_b);
-
-        diff = get_time_difference(&time_a, &time_b);
-        total_time = add_times(&total_time, &diff);
     }
 
     // join threads
-    void *return_value;
     tv *time_spent;
-
     for (int i = 1; i <= THREADS_NO; i++) {
-        return_value = NULL;
 
-        get_current_time(&time_a);
-        pthread_join(THREADS[i - 1], &return_value);
-        get_current_time(&time_b);
+        pthread_join(THREADS[i - 1], (void **) &time_spent);
 
-        time_spent = (tv *) return_value;
+        printf("Thread ID: %ld\n"
+               "Time spent: %ld [s] %ld [us]\n"
+               "=\n", THREADS[i - 1],
+               time_spent->tv_sec, time_spent->tv_usec);
 
-        printf("Thread ID:\t%ld, Spent %ld [s]\t%ld [us] filtering\n", THREADS[i - 1], time_spent->tv_sec, time_spent->tv_usec);
-
-        diff = get_time_difference(&time_a, &time_b);
-        total_time = add_times(&total_time, &diff);
+        total_time_threads = add_times(&total_time_threads, time_spent);
+        free(time_spent);
     }
 
+    get_current_time(&time_b);
+    total_time = get_time_difference(&time_a, &time_b);
+    total_time = add_times(&total_time, &total_time_threads);
+
     // calculate and print total time spent on filtering
-    printf("Total operation time:\t%ld [s]\t%ld [us]\n", total_time.tv_sec, total_time.tv_usec);
+    printf("Total operation time:\t%ld [s] %ld [us]\n", total_time.tv_sec, total_time.tv_usec);
 
     // save output image
     write_image_to_pgm(output_path, output);
@@ -119,51 +167,4 @@ int main(int argc, char **argv) {
     free(THREADS);
 
     return 0;
-}
-
-void *block_filtering(void *thread_no) {
-    int *kp = (int *) thread_no;
-    int k = *kp;
-    int c = ceil((double) image->columns / THREADS_NO);
-
-    int start_x = (k - 1) * c;
-    int end_x = k * c - 1;
-    int index;
-
-    tv time_start, time_end, diff;
-    get_current_time(&time_start);
-
-    for (int x = start_x; x < end_x; x++)
-        for (int row = 0; row < image->rows; row++) {
-            index = row * image->columns + x;
-            output->matrix[index] = (int) round(s_filter(image, filter, row, x));
-        }
-
-    get_current_time(&time_end);
-    diff = get_time_difference(&time_start, &time_end);
-
-    free(kp);
-    pthread_exit(&diff);
-}
-
-void *interleaved_filtering(void *thread_no) {
-    int *kp = (int *) thread_no;
-    int k = *kp;
-    int index;
-
-    tv time_start, time_end, diff;
-    get_current_time(&time_start);
-
-    for (int x = k - 1; x < image->columns; x += THREADS_NO)
-        for (int row = 0; row < image->rows; row++) {
-            index = row * image->columns + x;
-            output->matrix[index] = (int) round(s_filter(image, filter, row, x));
-        }
-
-
-    get_current_time(&time_end);
-    diff = get_time_difference(&time_start, &time_end);
-
-    free(kp);
-    pthread_exit(&diff);
 }

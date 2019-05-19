@@ -1,4 +1,3 @@
-// https://ugurkoltuk.wordpress.com/2010/03/04/an-extreme-simple-pgm-io-api/
 #ifndef CW08_IMAGES
 #define CW08_IMAGES
 
@@ -129,6 +128,7 @@ Filter *read_filter(char *filter_path) {
     Filter *filter = calloc(1, sizeof(Filter));
     if (!filter) show_error("Failed to allocate memory for filter");
 
+    fscanf(fp, "%d", &filter->size);
     allocate_filter_matrix(filter);
 
     double value;

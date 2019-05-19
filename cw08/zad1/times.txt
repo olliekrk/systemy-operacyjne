@@ -1,0 +1,241 @@
+nie, 19 maj 2019, 15:40:17 CEST
+=
+Threads:	 1
+Filter:	 block
+Image:	 512 x 512 pixels
+Filter:	 3 x 3
+Total time:	 0 [s]	148350 [us]
+=
+Threads:	 1
+Filter:	 interleaved
+Image:	 512 x 512 pixels
+Filter:	 3 x 3
+Total time:	 0 [s]	152790 [us]
+=
+Threads:	 2
+Filter:	 block
+Image:	 512 x 512 pixels
+Filter:	 3 x 3
+Total time:	 0 [s]	119319 [us]
+=
+Threads:	 2
+Filter:	 interleaved
+Image:	 512 x 512 pixels
+Filter:	 3 x 3
+Total time:	 0 [s]	145540 [us]
+=
+Threads:	 4
+Filter:	 block
+Image:	 512 x 512 pixels
+Filter:	 3 x 3
+Total time:	 0 [s]	123352 [us]
+=
+Threads:	 4
+Filter:	 interleaved
+Image:	 512 x 512 pixels
+Filter:	 3 x 3
+Total time:	 0 [s]	122107 [us]
+=
+Threads:	 8
+Filter:	 block
+Image:	 512 x 512 pixels
+Filter:	 3 x 3
+Total time:	 0 [s]	161092 [us]
+=
+Threads:	 8
+Filter:	 interleaved
+Image:	 512 x 512 pixels
+Filter:	 3 x 3
+Total time:	 0 [s]	185689 [us]
+=
+Threads:	 1
+Filter:	 block
+Image:	 512 x 512 pixels
+Filter:	 6 x 6
+Total time:	 0 [s]	522996 [us]
+=
+Threads:	 1
+Filter:	 interleaved
+Image:	 512 x 512 pixels
+Filter:	 6 x 6
+Total time:	 0 [s]	525412 [us]
+=
+Threads:	 2
+Filter:	 block
+Image:	 512 x 512 pixels
+Filter:	 6 x 6
+Total time:	 0 [s]	421342 [us]
+=
+Threads:	 2
+Filter:	 interleaved
+Image:	 512 x 512 pixels
+Filter:	 6 x 6
+Total time:	 0 [s]	425359 [us]
+=
+Threads:	 4
+Filter:	 block
+Image:	 512 x 512 pixels
+Filter:	 6 x 6
+Total time:	 0 [s]	395205 [us]
+=
+Threads:	 4
+Filter:	 interleaved
+Image:	 512 x 512 pixels
+Filter:	 6 x 6
+Total time:	 0 [s]	411400 [us]
+=
+Threads:	 8
+Filter:	 block
+Image:	 512 x 512 pixels
+Filter:	 6 x 6
+Total time:	 0 [s]	618812 [us]
+=
+Threads:	 8
+Filter:	 interleaved
+Image:	 512 x 512 pixels
+Filter:	 6 x 6
+Total time:	 0 [s]	610214 [us]
+=
+Threads:	 1
+Filter:	 block
+Image:	 512 x 512 pixels
+Filter:	 9 x 9
+Total time:	 1 [s]	143831 [us]
+=
+Threads:	 1
+Filter:	 interleaved
+Image:	 512 x 512 pixels
+Filter:	 9 x 9
+Total time:	 1 [s]	146581 [us]
+=
+Threads:	 2
+Filter:	 block
+Image:	 512 x 512 pixels
+Filter:	 9 x 9
+Total time:	 0 [s]	884193 [us]
+=
+Threads:	 2
+Filter:	 interleaved
+Image:	 512 x 512 pixels
+Filter:	 9 x 9
+Total time:	 0 [s]	879173 [us]
+=
+Threads:	 4
+Filter:	 block
+Image:	 512 x 512 pixels
+Filter:	 9 x 9
+Total time:	 0 [s]	849693 [us]
+=
+Threads:	 4
+Filter:	 interleaved
+Image:	 512 x 512 pixels
+Filter:	 9 x 9
+Total time:	 0 [s]	867008 [us]
+=
+Threads:	 8
+Filter:	 block
+Image:	 512 x 512 pixels
+Filter:	 9 x 9
+Total time:	 1 [s]	420971 [us]
+=
+Threads:	 8
+Filter:	 interleaved
+Image:	 512 x 512 pixels
+Filter:	 9 x 9
+Total time:	 1 [s]	575410 [us]
+=
+Threads:	 1
+Filter:	 block
+Image:	 512 x 512 pixels
+Filter:	 12 x 12
+Total time:	 2 [s]	27654 [us]
+=
+Threads:	 1
+Filter:	 interleaved
+Image:	 512 x 512 pixels
+Filter:	 12 x 12
+Total time:	 2 [s]	25043 [us]
+=
+Threads:	 2
+Filter:	 block
+Image:	 512 x 512 pixels
+Filter:	 12 x 12
+Total time:	 1 [s]	543070 [us]
+=
+Threads:	 2
+Filter:	 interleaved
+Image:	 512 x 512 pixels
+Filter:	 12 x 12
+Total time:	 1 [s]	540672 [us]
+=
+Threads:	 4
+Filter:	 block
+Image:	 512 x 512 pixels
+Filter:	 12 x 12
+Total time:	 1 [s]	558323 [us]
+=
+Threads:	 4
+Filter:	 interleaved
+Image:	 512 x 512 pixels
+Filter:	 12 x 12
+Total time:	 1 [s]	588201 [us]
+=
+Threads:	 8
+Filter:	 block
+Image:	 512 x 512 pixels
+Filter:	 12 x 12
+Total time:	 2 [s]	609698 [us]
+=
+Threads:	 8
+Filter:	 interleaved
+Image:	 512 x 512 pixels
+Filter:	 12 x 12
+Total time:	 2 [s]	544955 [us]
+=
+Threads:	 1
+Filter:	 block
+Image:	 512 x 512 pixels
+Filter:	 22 x 22
+Total time:	 6 [s]	770810 [us]
+=
+Threads:	 1
+Filter:	 interleaved
+Image:	 512 x 512 pixels
+Filter:	 22 x 22
+Total time:	 6 [s]	775497 [us]
+=
+Threads:	 2
+Filter:	 block
+Image:	 512 x 512 pixels
+Filter:	 22 x 22
+Total time:	 5 [s]	75598 [us]
+=
+Threads:	 2
+Filter:	 interleaved
+Image:	 512 x 512 pixels
+Filter:	 22 x 22
+Total time:	 5 [s]	88918 [us]
+=
+Threads:	 4
+Filter:	 block
+Image:	 512 x 512 pixels
+Filter:	 22 x 22
+Total time:	 5 [s]	52906 [us]
+=
+Threads:	 4
+Filter:	 interleaved
+Image:	 512 x 512 pixels
+Filter:	 22 x 22
+Total time:	 5 [s]	121297 [us]
+=
+Threads:	 8
+Filter:	 block
+Image:	 512 x 512 pixels
+Filter:	 22 x 22
+Total time:	 8 [s]	163041 [us]
+=
+Threads:	 8
+Filter:	 interleaved
+Image:	 512 x 512 pixels
+Filter:	 22 x 22
+Total time:	 8 [s]	969110 [us]
