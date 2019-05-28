@@ -57,6 +57,7 @@ void initialize_coaster() {
     }
 
     station_trolleyID = 0;
+    signal(SIGUSR1, passenger_cleanup);
 }
 
 void start_coaster() {
@@ -72,14 +73,10 @@ void finalize_coaster() {
     for (int i = 0; i < TOTAL_TROLLEYS; i++)
         pthread_join(T_TROLLEYS[i], NULL);
 
-    RUN = 0;
     for (int i = 0; i < TOTAL_PASSENGERS; i++) {
+        pthread_kill(T_PASSENGERS[i], SIGUSR1);
         pthread_join(T_PASSENGERS[i], NULL);
     }
-    /*
-     * TODO:
-     * 2. passengers are notified at the end
-     * */
 
     for (int i = 0; i < TOTAL_TROLLEYS; i++) {
         pthread_cond_destroy(&trolleys_cond[i]);
@@ -107,8 +104,7 @@ void *passenger_role(void *initial_data) {
     Passenger *passenger = (Passenger *) initial_data;
 
     while (RUN) {
-        while (RUN && pthread_mutex_trylock(&passenger_mutex) != 0);
-        if (!RUN) break;
+        pthread_mutex_lock(&passenger_mutex);
 
         passenger->trolleyID = station_trolleyID;
         TROLLEYS[station_trolleyID].passengers[TROLLEYS[station_trolleyID].passengersCount] = *passenger;
@@ -122,9 +118,7 @@ void *passenger_role(void *initial_data) {
             pthread_mutex_unlock(&passenger_mutex);
         }
 
-        while (RUN && pthread_mutex_trylock(&trolleys_mutex[passenger->trolleyID]) != 0);
-        if (!RUN) break;
-
+        pthread_mutex_lock(&trolleys_mutex[passenger->trolleyID]);
         TROLLEYS[station_trolleyID].passengersCount--;
         print_coaster_event(PASSENGER_OUT, passenger->passengerID, TROLLEYS[station_trolleyID].passengersCount);
 
@@ -139,6 +133,13 @@ void *passenger_role(void *initial_data) {
 
     print_coaster_event(PASSENGER_KILL, passenger->passengerID, -1);
     pthread_exit((void *) 0);
+}
+
+void passenger_cleanup(int sig) {
+    if (sig == SIGUSR1) {
+        print_coaster_event(PASSENGER_KILL, -1, -1);
+        pthread_exit((void *) 0);
+    }
 }
 
 void *trolley_role(void *initial_data) {

@@ -8,6 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <signal.h>
 #include <sys/time.h>
 #include <pthread.h>
 
@@ -64,6 +65,8 @@ int RUN = 1;
 
 void *passenger_role(void *);
 
+void passenger_cleanup(int);
+
 void *trolley_role(void *);
 
 void initialize_coaster();
@@ -103,7 +106,7 @@ void print_coaster_event(CoasterEventType event, int ID, int capacity) {
             printf("PASSENGER: %d PRESSED START\n", ID);
             break;
         case PASSENGER_KILL:
-            printf("PASSENGER: %d LEFT\n", ID);
+            printf("PASSENGER HAS LEFT\n");
             break;
         case TROLLEY_CLOSE:
             printf("TROLLEY: %d DOOR CLOSED\n", ID);
