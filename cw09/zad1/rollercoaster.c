@@ -70,13 +70,11 @@ void start_coaster() {
 
 void finalize_coaster() {
 
-    for (int i = 0; i < TOTAL_TROLLEYS; i++)
-        pthread_join(T_TROLLEYS[i], NULL);
+    for (int i = 0; i < TOTAL_TROLLEYS; i++) pthread_join(T_TROLLEYS[i], NULL);
 
-    for (int i = 0; i < TOTAL_PASSENGERS; i++) {
-        pthread_kill(T_PASSENGERS[i], SIGUSR1);
-        pthread_join(T_PASSENGERS[i], NULL);
-    }
+    for (int i = 0; i < TOTAL_PASSENGERS; i++) pthread_kill(T_PASSENGERS[i], SIGUSR1);
+
+    for (int i = 0; i < TOTAL_PASSENGERS; i++) pthread_join(T_PASSENGERS[i], NULL);
 
     for (int i = 0; i < TOTAL_TROLLEYS; i++) {
         pthread_cond_destroy(&trolleys_cond[i]);
@@ -136,8 +134,11 @@ void *passenger_role(void *initial_data) {
 }
 
 void passenger_cleanup(int sig) {
+    int i;
+    long threadID = pthread_self();
     if (sig == SIGUSR1) {
-        print_coaster_event(PASSENGER_KILL, -1, -1);
+        for (i = 0; i < TOTAL_PASSENGERS; i++) if (T_PASSENGERS[i] == threadID) break;
+        print_coaster_event(PASSENGER_KILL, i, -1);
         pthread_exit((void *) 0);
     }
 }
