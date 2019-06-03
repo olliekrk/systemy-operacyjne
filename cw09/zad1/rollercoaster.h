@@ -15,6 +15,7 @@
 typedef struct Passenger {
     int passengerID;
     int trolleyID;
+    int rides;
 } Passenger;
 
 typedef struct Trolley {

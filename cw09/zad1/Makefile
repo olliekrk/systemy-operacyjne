@@ -8,5 +8,5 @@ build: rollercoaster.c rollercoaster.h
 	gcc rollercoaster.o -o rollercoaster -lpthread -lm
 
 run:
-	./rollercoaster 12 2 5 2
+	./rollercoaster 100 3 3 3
 # <TOTAL_PASSENGERS> <TOTAL_TROLLEYS> <TOTAL_CAPACITY> <TOTAL_LOOPS>

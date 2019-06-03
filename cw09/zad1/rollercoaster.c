@@ -45,6 +45,7 @@ void initialize_coaster() {
     for (int i = 0; i < TOTAL_PASSENGERS; i++) {
         PASSENGERS[i].passengerID = i;
         PASSENGERS[i].trolleyID = -1;
+        PASSENGERS[i].rides = 0;
     }
 
     for (int i = 0; i < TOTAL_TROLLEYS; i++) {
@@ -75,6 +76,9 @@ void finalize_coaster() {
     for (int i = 0; i < TOTAL_PASSENGERS; i++) pthread_kill(T_PASSENGERS[i], SIGUSR1);
 
     for (int i = 0; i < TOTAL_PASSENGERS; i++) pthread_join(T_PASSENGERS[i], NULL);
+
+    for (int i = 0; i < TOTAL_PASSENGERS; i++)
+        printf("PASSENGER NO. %d\t RIDES: %d\n", i, PASSENGERS[i].rides);
 
     for (int i = 0; i < TOTAL_TROLLEYS; i++) {
         pthread_cond_destroy(&trolleys_cond[i]);
@@ -108,6 +112,7 @@ void *passenger_role(void *initial_data) {
         TROLLEYS[station_trolleyID].passengers[TROLLEYS[station_trolleyID].passengersCount] = *passenger;
         TROLLEYS[station_trolleyID].passengersCount++;
         print_coaster_event(PASSENGER_IN, passenger->passengerID, TROLLEYS[station_trolleyID].passengersCount);
+        passenger->rides++;
 
         if (TROLLEYS[station_trolleyID].passengersCount == TOTAL_CAPACITY) {
             pthread_cond_signal(&trolley_ready_cond);
