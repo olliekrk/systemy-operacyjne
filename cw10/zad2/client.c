@@ -17,18 +17,16 @@ int main(int argc, char **argv) {
     while (1) {
         message msg = get_message();
         switch (msg.type) {
-            case OK: {
+            case OK:
                 break;
-            }
-            case PING: {
+            case PING:
                 send_empty(PONG);
                 break;
-            }
             case NAME_TAKEN:
                 show_error("Name is already taken");
             case FULL:
                 show_error("Server is full");
-            case WORK: {
+            case WORK:
                 printf("Started new task...");
                 char *buffer = malloc(100 + 2 * msg.size);
                 if (buffer == NULL) show_error("Memory allocation failure");
@@ -44,7 +42,6 @@ int main(int argc, char **argv) {
                 send_done(msg.id, buffer);
                 free(buffer);
                 break;
-            }
             default:
                 break;
         }
@@ -69,13 +66,14 @@ void client_initialize(char *type, char *address) {
         uint16_t port_num = strtol(port, NULL, 10);
         if (port_num < 1024) show_error("Invalid port number");
 
+        if ((socket_fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) show_error("Socket creation failed");
+
         struct sockaddr_in web_addr;
         memset(&web_addr, 0, sizeof(struct sockaddr_in));
         web_addr.sin_family = AF_INET;
         web_addr.sin_addr.s_addr = in_addr;
         web_addr.sin_port = htons(port_num);
 
-        if ((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) show_error("Socket creation failed");
         if (connect(socket_fd, (const struct sockaddr *) &web_addr, sizeof(web_addr))) show_error("Connect has failed");
 
     } else if (strcmp("UNIX", type) == 0) {
@@ -83,13 +81,19 @@ void client_initialize(char *type, char *address) {
 
         if (strlen(un_path) < 1 || strlen(un_path) > MAX_UNIXPATH) show_error("Invalid UNIX socket path");
 
-        struct sockaddr_un un_addr;
-        un_addr.sun_family = AF_UNIX;
-        snprintf(un_addr.sun_path, MAX_UNIXPATH, "%s", un_path);
+        struct sockaddr_un unix_addr;
+        unix_addr.sun_family = AF_UNIX;
+        snprintf(unix_addr.sun_path, MAX_UNIXPATH, "%s", un_path);
 
-        if ((socket_fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) show_error("Socket creation failed");
+        struct sockaddr_un unix_client_addr;
+        memset(&unix_client_addr, 0, sizeof(unix_client_addr));
+        unix_client_addr.sun_family = AF_UNIX;
+        snprintf(unix_client_addr.sun_path, MAX_UNIXPATH, "%s", client_name);
 
-        if (connect(socket_fd, (const struct sockaddr *) &un_addr, sizeof(un_addr))) show_error("Connect has failed");
+        if ((socket_fd = socket(AF_UNIX, SOCK_DGRAM, 0)) < 0) show_error("Socket creation failed");
+
+        if (connect(socket_fd, (const struct sockaddr *) &unix_addr, sizeof(unix_addr)))
+            show_error("Connect has failed");
     } else {
         show_error("Invalid connection type argument");
     }
@@ -97,49 +101,71 @@ void client_initialize(char *type, char *address) {
     send_empty(REGISTER);
 }
 
-void send_message(message *msg) {
-    write(socket_fd, &msg->type, sizeof(msg->type));
-    write(socket_fd, &msg->size, sizeof(msg->size));
-    write(socket_fd, &msg->name_size, sizeof(msg->name_size));
-    write(socket_fd, &msg->id, sizeof(msg->id));
-    if (msg->size > 0) write(socket_fd, msg->content, msg->size);
-    if (msg->name_size > 0) write(socket_fd, msg->name, msg->name_size);
+void send_message(message msg) {
+    ssize_t header_size = sizeof(msg.type) + sizeof(msg.size) + sizeof(msg.name_size) + sizeof(msg.id);
+    ssize_t size = header_size + msg.size + 1 + msg.name_size + 1;
+    int8_t *buff = malloc(size);
+    if (buff == NULL) show_error("Memory allocation failure");
+
+    memcpy(buff, &msg.type, sizeof(msg.type));
+    memcpy(buff + sizeof(msg.type), &msg.size, sizeof(msg.size));
+    memcpy(buff + sizeof(msg.type) + sizeof(msg.size), &msg.name_size, sizeof(msg.name_size));
+    memcpy(buff + sizeof(msg.type) + sizeof(msg.size) + sizeof(msg.name_size), &msg.id, sizeof(msg.id));
+
+    if (msg.size > 0 && msg.content != NULL)
+        memcpy(buff + header_size, msg.content, msg.size + 1);
+    if (msg.name_size > 0 && msg.name != NULL)
+        memcpy(buff + header_size + msg.size + 1, msg.name, msg.name_size + 1);
+
+    if (write(socket_fd, buff, size) != size) show_error("Write to connection has failed");
+
+    free(buff);
 }
 
 void send_empty(message_type type) {
-    message msg = {type, 0, strlen(client_name) + 1, 0, NULL, client_name};
-    send_message(&msg);
+    message msg = {type, 0, strlen(client_name), 0, NULL, client_name};
+    send_message(msg);
 }
 
 void send_done(int id, char *content) {
-    message msg = {WORK_DONE, strlen(content) + 1, strlen(client_name) + 1, id, content, client_name};
-    send_message(&msg);
+    message msg = {WORK_DONE, strlen(content), strlen(client_name), id, content, client_name};
+    send_message(msg);
 }
 
 message get_message(void) {
     message msg;
-    if (read(socket_fd, &msg.type, sizeof(msg.type)) != sizeof(msg.type))
-        show_error("Unknown message from server");
-    if (read(socket_fd, &msg.size, sizeof(msg.size)) != sizeof(msg.size))
-        show_error("Unknown message from server");
-    if (read(socket_fd, &msg.name_size, sizeof(msg.name_size)) != sizeof(msg.name_size))
-        show_error("Unknown message from server");
-    if (read(socket_fd, &msg.id, sizeof(msg.id)) != sizeof(msg.id))
-        show_error("Unknown message from server");
+    ssize_t header_size = sizeof(msg.type) + sizeof(msg.size) + sizeof(msg.name_size) + sizeof(msg.id);
+    int8_t buff[header_size];
+    if (recv(socket_fd, buff, header_size, MSG_PEEK) < header_size)
+        show_error("Too short header received");
+
+    memcpy(&msg.type, buff, sizeof(msg.type));
+    memcpy(&msg.size, buff + sizeof(msg.type), sizeof(msg.size));
+    memcpy(&msg.name_size, buff + sizeof(msg.type) + sizeof(msg.size), sizeof(msg.name_size));
+    memcpy(&msg.id, buff + sizeof(msg.type) + sizeof(msg.size) + sizeof(msg.name_size), sizeof(msg.id));
+
+    ssize_t size = header_size + msg.size + 1 + msg.name_size + 1;
+    int8_t *buffer = malloc(size);
+
+    if (recv(socket_fd, buffer, size, 0) < size) show_error("Too short message received");
+
     if (msg.size > 0) {
         msg.content = malloc(msg.size + 1);
-        if (msg.content == NULL) show_error("Invalid message content");
-        if (read(socket_fd, msg.content, msg.size) != msg.size) show_error("Invalid message content");
+        if (msg.content == NULL) show_error("Unknown message from server");
+        memcpy(msg.content, buffer + header_size, msg.size + 1);
     } else {
         msg.content = NULL;
     }
+
     if (msg.name_size > 0) {
         msg.name = malloc(msg.name_size + 1);
-        if (msg.name == NULL) show_error("Invalid message content");
-        if (read(socket_fd, msg.name, msg.name_size) != msg.name_size) show_error("Invalid message content");
+        if (msg.name == NULL) show_error("Unknown message from server");
+        memcpy(msg.name, buffer + header_size + msg.size + 1, msg.name_size + 1);
     } else {
         msg.name = NULL;
     }
+
+    free(buffer);
     return msg;
 }
 
@@ -154,6 +180,7 @@ void SIGINT_handler(int sig) {
 
 void client_cleanup(void) {
     send_empty(UNREGISTER);
+    unlink(client_name);
     shutdown(socket_fd, SHUT_RDWR);
     close(socket_fd);
 }
