@@ -75,6 +75,7 @@ void *commander_loop(void *args) {
 
         fseek(file, 0, SEEK_END);
         size_t size = ftell(file);
+        printf("File size is %ld\n", size);
         fseek(file, 0L, SEEK_SET);
 
         char *file_buff = malloc(size + 1);
