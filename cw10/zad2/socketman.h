@@ -20,9 +20,7 @@
 #include <pthread.h>
 
 #define MAX_CLIENTS 16
-#define MAX_CLIENTNAME 20
-#define MAX_UNIXPATH 100
-#define MAX_BACKLOG 64
+#define UNIX_PATH_MAX 100
 
 typedef enum message_type {
     REGISTER,
@@ -32,7 +30,6 @@ typedef enum message_type {
     OK,
     NAME_TAKEN,
     FULL,
-    FAIL,
     WORK,
     WORK_DONE,
 } message_type;
@@ -51,8 +48,8 @@ typedef struct client {
     char *name;
     struct sockaddr *addr;
     socklen_t addr_len;
-    uint8_t working;
-    uint8_t inactive;
+    uint8_t is_working;
+    uint8_t is_inactive;
 } client;
 
 void show_error(const char *message) {
@@ -61,10 +58,6 @@ void show_error(const char *message) {
 }
 
 typedef struct timeval tv;
-
-void print_time(tv *time) {
-    printf("%ld s, %ld us\n", time->tv_sec, time->tv_usec);
-}
 
 void get_current_time(tv *buffer) {
     gettimeofday(buffer, NULL);

@@ -45,10 +45,8 @@ int main(int argc, char **argv) {
             default:
                 break;
         }
-
         delete_message(msg);
     }
-
 }
 
 void client_initialize(char *type, char *address) {
@@ -79,20 +77,22 @@ void client_initialize(char *type, char *address) {
     } else if (strcmp("UNIX", type) == 0) {
         char *un_path = address;
 
-        if (strlen(un_path) < 1 || strlen(un_path) > MAX_UNIXPATH) show_error("Invalid UNIX socket path");
+        if (strlen(un_path) < 1 || strlen(un_path) > UNIX_PATH_MAX) show_error("Invalid UNIX socket path");
 
         struct sockaddr_un unix_addr;
         unix_addr.sun_family = AF_UNIX;
-        snprintf(unix_addr.sun_path, MAX_UNIXPATH, "%s", un_path);
+        snprintf(unix_addr.sun_path, UNIX_PATH_MAX, "%s", un_path);
 
         struct sockaddr_un unix_client_addr;
         memset(&unix_client_addr, 0, sizeof(unix_client_addr));
         unix_client_addr.sun_family = AF_UNIX;
-        snprintf(unix_client_addr.sun_path, MAX_UNIXPATH, "%s", client_name);
+        snprintf(unix_client_addr.sun_path, UNIX_PATH_MAX, "%s", client_name);
 
-        if ((socket_fd = socket(AF_UNIX, SOCK_DGRAM, 0)) < 0) show_error("Socket creation failed");
-
-        if (connect(socket_fd, (const struct sockaddr *) &unix_addr, sizeof(unix_addr)))
+        if ((socket_fd = socket(AF_UNIX, SOCK_DGRAM, 0)) < 0)
+            show_error("Socket creation failed");
+        if (bind(socket_fd, (const struct sockaddr *) &unix_client_addr, sizeof(unix_client_addr)) < 0)
+            show_error("Client bind has failed");
+        if (connect(socket_fd, (const struct sockaddr *) &unix_addr, sizeof(unix_addr)) < 0)
             show_error("Connect has failed");
     } else {
         show_error("Invalid connection type argument");

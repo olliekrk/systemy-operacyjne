@@ -18,6 +18,7 @@ int main(int argc, char **argv) {
         message msg = get_message();
         switch (msg.type) {
             case OK: {
+                printf("Successfully registered on the server\n");
                 break;
             }
             case PING: {
@@ -46,7 +47,7 @@ int main(int argc, char **argv) {
                 break;
             }
             default:
-                break;
+                printf("Unknown message type received\n");
         }
 
         delete_message(msg);
@@ -67,7 +68,7 @@ void client_initialize(char *type, char *address) {
         if (in_addr == INADDR_NONE) show_error("Invalid address argument");
 
         uint16_t port_num = strtol(port, NULL, 10);
-        if (port_num < 1024) show_error("Invalid port number");
+        if (port_num < 1024) show_error("Invalid privileged port number");
 
         struct sockaddr_in web_addr;
         memset(&web_addr, 0, sizeof(struct sockaddr_in));
@@ -81,11 +82,11 @@ void client_initialize(char *type, char *address) {
     } else if (strcmp("UNIX", type) == 0) {
         char *un_path = address;
 
-        if (strlen(un_path) < 1 || strlen(un_path) > MAX_UNIXPATH) show_error("Invalid UNIX socket path");
+        if (strlen(un_path) < 1 || strlen(un_path) > UNIX_PATH_MAX) show_error("Invalid UNIX socket path");
 
         struct sockaddr_un un_addr;
         un_addr.sun_family = AF_UNIX;
-        snprintf(un_addr.sun_path, MAX_UNIXPATH, "%s", un_path);
+        snprintf(un_addr.sun_path, UNIX_PATH_MAX, "%s", un_path);
 
         if ((socket_fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) show_error("Socket creation failed");
 

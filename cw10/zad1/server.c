@@ -6,17 +6,17 @@ int main(int argc, char **argv) {
                    "PORT\tUNIX SOCKET PATH");
 
     server_port = strtol(argv[1], NULL, 10);
-    if (server_port < 1024) show_error("Invalid port");
-
     unix_path = argv[2];
-    if (strlen(unix_path) < 1 || strlen(unix_path) > MAX_UNIXPATH) show_error("Invalid UNIX socket path");
+
+    if (server_port < 1024) show_error("Invalid port");
+    if (strlen(unix_path) < 1 || strlen(unix_path) > UNIX_PATH_MAX) show_error("Invalid UNIX socket path");
 
     server_initialize();
 
     struct epoll_event event;
     while (1) {
-        if (epoll_wait(epoll, &event, 1, -1) < 0) show_error("epoll failed");
-        if (event.data.fd < 0) register_handler(-event.data.fd);
+        if (epoll_wait(epoll, &event, 1, -1) < 0) show_error("Epoll awaiting has failed");
+        if (event.data.fd < 0) epoll_register_client(-event.data.fd);
         else message_handler(event.data.fd);
     }
 }
@@ -29,17 +29,17 @@ void server_initialize() {
     struct sockaddr_in web_addr;
     memset(&web_addr, 0, sizeof(struct sockaddr_in)); // fill allocated memory with zeros
     web_addr.sin_family = AF_INET;
-    web_addr.sin_addr.s_addr = inet_addr("0.0.0.0");
+    web_addr.sin_addr.s_addr = INADDR_ANY;
     web_addr.sin_port = htons(server_port);
 
     if ((web_socket_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) show_error("Websocket creation failed");
-    if (bind(web_socket_fd, (const struct sockaddr *) &web_addr, sizeof(web_addr))) show_error("Bind failed");
-    if (listen(web_socket_fd, MAX_BACKLOG)) show_error("Listen failed");
+    if (bind(web_socket_fd, (const struct sockaddr *) &web_addr, sizeof(web_addr))) show_error("Binding address failed");
+    if (listen(web_socket_fd, MAX_CLIENTS)) show_error("Listen setting failed");
 
     // unix socket initialization
     struct sockaddr_un unix_addr;
-    snprintf(unix_addr.sun_path, MAX_UNIXPATH, "%s", unix_path);
     unix_addr.sun_family = AF_UNIX;
+    snprintf(unix_addr.sun_path, UNIX_PATH_MAX, "%s", unix_path);
 
     if ((unix_socket_fd = socket(AF_UNIX, SOCK_STREAM, 0)) < 0) show_error("UNIX socket creation failed");
     if (bind(unix_socket_fd, (const struct sockaddr *) &unix_addr, sizeof(unix_addr))) show_error("Bind failed");
@@ -51,14 +51,14 @@ void server_initialize() {
 
     if ((epoll = epoll_create1(0)) < 0) show_error("Epoll creation failed");
     event.data.fd = -web_socket_fd;
-    if (epoll_ctl(epoll, EPOLL_CTL_ADD, web_socket_fd, &event)) show_error("Epoll error");
+    if (epoll_ctl(epoll, EPOLL_CTL_ADD, web_socket_fd, &event)) show_error("Epoll registering error");
     event.data.fd = -unix_socket_fd;
-    if (epoll_ctl(epoll, EPOLL_CTL_ADD, unix_socket_fd, &event)) show_error("Epoll error");
+    if (epoll_ctl(epoll, EPOLL_CTL_ADD, unix_socket_fd, &event)) show_error("Epoll registering error");
 
     // threads initialization
     pthread_create(&commander, NULL, commander_loop, NULL);
-    pthread_detach(commander);
     pthread_create(&pinger, NULL, pinger_loop, NULL);
+    pthread_detach(commander);
     pthread_detach(pinger);
 }
 
@@ -97,12 +97,12 @@ void *commander_loop(void *args) {
 
         fclose(file);
 
-        pthread_mutex_lock(&client_mutex);
+        pthread_mutex_lock(&clients_mutex);
         for (int i = 0; i < MAX_CLIENTS; i++) {
             if (!CLIENTS[i].fd) continue;
-            if (min > CLIENTS[i].working) {
+            if (min > CLIENTS[i].is_working) {
                 min_i = i;
-                min = CLIENTS[i].working;
+                min = CLIENTS[i].is_working;
             }
         }
 
@@ -110,34 +110,34 @@ void *commander_loop(void *args) {
             message msg = {WORK, strlen(file_buff) + 1, 0, ++ID, file_buff, NULL};
             printf("TASK NO. %lu HAS BEEN SENT TO %s\n", ID, CLIENTS[min_i].name);
             send_msg(CLIENTS[min_i].fd, msg);
-            CLIENTS[min_i].working++;
+            CLIENTS[min_i].is_working++;
         } else {
             fprintf(stderr, "Zero clients available for task\n");
         }
 
-        pthread_mutex_unlock(&client_mutex);
+        pthread_mutex_unlock(&clients_mutex);
         free(file_buff);
     }
 }
 
 void *pinger_loop(void *args) {
     while (1) {
-        pthread_mutex_lock(&client_mutex);
+        pthread_mutex_lock(&clients_mutex);
         for (int i = 0; i < MAX_CLIENTS; i++) {
             if (CLIENTS[i].fd == 0) continue;
-            if (CLIENTS[i].inactive) {
+            if (CLIENTS[i].is_inactive) {
                 delete_client(i);
             } else {
-                CLIENTS[i].inactive = 1;
+                CLIENTS[i].is_inactive = 1;
                 send_empty(CLIENTS[i].fd, PING);
             }
         }
-        pthread_mutex_unlock(&client_mutex);
+        pthread_mutex_unlock(&clients_mutex);
         sleep(10);
     }
 }
 
-void register_handler(int sock) {
+void epoll_register_client(int sock) {
     printf("New client will be registered\n");
     int client = accept(sock, NULL, NULL);
     if (client == -1) show_error("Failed to accept client connection");
@@ -149,7 +149,7 @@ void register_handler(int sock) {
 
 void message_handler(int sock) {
     message msg = get_message(sock);
-    pthread_mutex_lock(&client_mutex);
+    pthread_mutex_lock(&clients_mutex);
 
     switch (msg.type) {
         case REGISTER: {
@@ -171,8 +171,8 @@ void message_handler(int sock) {
             CLIENTS[i].name = malloc(msg.size + 1);
             if (CLIENTS[i].name == NULL) show_error("Memory allocation for client's client_name failed");
             strcpy(CLIENTS[i].name, msg.name);
-            CLIENTS[i].working = 0;
-            CLIENTS[i].inactive = 0;
+            CLIENTS[i].is_working = 0;
+            CLIENTS[i].is_inactive = 0;
 
             send_empty(sock, reply);
             break;
@@ -187,8 +187,8 @@ void message_handler(int sock) {
         case WORK_DONE: {
             int i = get_clientID(msg.name);
             if (i < MAX_CLIENTS) {
-                CLIENTS[i].inactive = 0;
-                CLIENTS[i].working--;
+                CLIENTS[i].is_inactive = 0;
+                CLIENTS[i].is_working--;
             }
             printf("TASK NO. %lu COMPLETED BY %s:\n%s\n", msg.id, (char *) msg.name, (char *) msg.content);
             break;
@@ -196,11 +196,11 @@ void message_handler(int sock) {
         case PONG: {
             int i = get_clientID(msg.name);
             if (i < MAX_CLIENTS)
-                CLIENTS[i].inactive = 0;
+                CLIENTS[i].is_inactive = 0;
         }
     }
 
-    pthread_mutex_unlock(&client_mutex);
+    pthread_mutex_unlock(&clients_mutex);
     delete_message(msg);
 }
 
@@ -208,8 +208,8 @@ void delete_client(int i) {
     delete_socket(CLIENTS[i].fd);
     CLIENTS[i].fd = 0;
     CLIENTS[i].name = NULL;
-    CLIENTS[i].working = 0;
-    CLIENTS[i].inactive = 0;
+    CLIENTS[i].is_working = 0;
+    CLIENTS[i].is_inactive = 0;
 }
 
 int get_clientID(char *client_name) {

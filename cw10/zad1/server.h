@@ -17,7 +17,7 @@ char *unix_path;
 uint64_t ID;
 
 client CLIENTS[MAX_CLIENTS];
-pthread_mutex_t client_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t clients_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_t pinger;
 pthread_t commander;
 
@@ -27,7 +27,7 @@ void *commander_loop(void *);
 
 void *pinger_loop(void *);
 
-void register_handler(int);
+void epoll_register_client(int);
 
 void message_handler(int);
 

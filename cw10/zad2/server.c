@@ -9,7 +9,7 @@ int main(int argc, char **argv) {
     if (server_port < 1024) show_error("Invalid port");
 
     unix_path = argv[2];
-    if (strlen(unix_path) < 1 || strlen(unix_path) > MAX_UNIXPATH) show_error("Invalid UNIX socket path");
+    if (strlen(unix_path) < 1 || strlen(unix_path) > UNIX_PATH_MAX) show_error("Invalid UNIX socket path");
 
     server_initialize();
 
@@ -36,7 +36,7 @@ void server_initialize() {
 
     // unix socket initialization
     struct sockaddr_un unix_addr;
-    snprintf(unix_addr.sun_path, MAX_UNIXPATH, "%s", unix_path);
+    snprintf(unix_addr.sun_path, UNIX_PATH_MAX, "%s", unix_path);
     unix_addr.sun_family = AF_UNIX;
 
     if ((unix_socket_fd = socket(AF_UNIX, SOCK_DGRAM, 0)) < 0) show_error("UNIX socket creation failed");
@@ -94,12 +94,12 @@ void *commander_loop(void *args) {
 
         fclose(file);
 
-        pthread_mutex_lock(&client_mutex);
+        pthread_mutex_lock(&clients_mutex);
         for (int i = 0; i < MAX_CLIENTS; i++) {
             if (!CLIENTS[i].fd) continue;
-            if (min > CLIENTS[i].working) {
+            if (min > CLIENTS[i].is_working) {
                 min_i = i;
-                min = CLIENTS[i].working;
+                min = CLIENTS[i].is_working;
             }
         }
 
@@ -107,29 +107,29 @@ void *commander_loop(void *args) {
             message msg = {WORK, strlen(file_buff) + 1, 0, ++ID, file_buff, NULL};
             printf("TASK NO. %lu HAS BEEN SENT TO %s\n", ID, CLIENTS[min_i].name);
             send_message(CLIENTS[min_i].fd, msg);
-            CLIENTS[min_i].working++;
+            CLIENTS[min_i].is_working++;
         } else {
             fprintf(stderr, "Zero clients available for task\n");
         }
 
-        pthread_mutex_unlock(&client_mutex);
+        pthread_mutex_unlock(&clients_mutex);
         free(file_buff);
     }
 }
 
 void *pinger_loop(void *args) {
     while (1) {
-        pthread_mutex_lock(&client_mutex);
+        pthread_mutex_lock(&clients_mutex);
         for (int i = 0; i < MAX_CLIENTS; i++) {
             if (CLIENTS[i].fd == 0) continue;
-            if (CLIENTS[i].inactive) {
+            if (CLIENTS[i].is_inactive) {
                 delete_client(i);
             } else {
-                CLIENTS[i].inactive = 1;
+                CLIENTS[i].is_inactive = 1;
                 send_empty(i, PING);
             }
         }
-        pthread_mutex_unlock(&client_mutex);
+        pthread_mutex_unlock(&clients_mutex);
         sleep(10);
     }
 }
@@ -139,7 +139,7 @@ void message_handler(int sock) {
     struct sockaddr *addr = malloc(addr_len);
 
     message msg = get_message(sock, addr, &addr_len);
-    pthread_mutex_lock(&client_mutex);
+    pthread_mutex_lock(&clients_mutex);
 
     switch (msg.type) {
         case REGISTER: {
@@ -162,8 +162,8 @@ void message_handler(int sock) {
             strcpy(CLIENTS[i].name, msg.name);
             CLIENTS[i].addr = addr;
             CLIENTS[i].addr_len = addr_len;
-            CLIENTS[i].working = 0;
-            CLIENTS[i].inactive = 0;
+            CLIENTS[i].is_working = 0;
+            CLIENTS[i].is_inactive = 0;
 
             send_empty(i, reply);
             break;
@@ -178,8 +178,8 @@ void message_handler(int sock) {
         case WORK_DONE: {
             int i = get_clientID(msg.name);
             if (i < MAX_CLIENTS) {
-                CLIENTS[i].inactive = 0;
-                CLIENTS[i].working--;
+                CLIENTS[i].is_inactive = 0;
+                CLIENTS[i].is_working--;
             }
             printf("TASK NO. %lu COMPLETED BY %s:\n%s\n", msg.id, (char *) msg.name, (char *) msg.content);
             break;
@@ -187,11 +187,11 @@ void message_handler(int sock) {
         case PONG: {
             int i = get_clientID(msg.name);
             if (i < MAX_CLIENTS)
-                CLIENTS[i].inactive = 0;
+                CLIENTS[i].is_inactive = 0;
         }
     }
 
-    pthread_mutex_unlock(&client_mutex);
+    pthread_mutex_unlock(&clients_mutex);
     delete_message(msg);
 }
 
@@ -202,8 +202,8 @@ void delete_client(int i) {
     free(CLIENTS[i].addr);
     CLIENTS[i].addr = NULL;
     CLIENTS[i].addr_len = 0;
-    CLIENTS[i].working = 0;
-    CLIENTS[i].inactive = 0;
+    CLIENTS[i].is_working = 0;
+    CLIENTS[i].is_inactive = 0;
 }
 
 int get_clientID(char *client_name) {
