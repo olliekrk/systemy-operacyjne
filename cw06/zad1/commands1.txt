@@ -1,0 +1,4 @@
+ECHO wololololololo!
+ECHO echo_works
+2ONE 0 private_message_works
+LIST

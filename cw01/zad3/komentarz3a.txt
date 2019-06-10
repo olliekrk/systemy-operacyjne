@@ -1,0 +1,4 @@
+1. Najdłużej trwa przeprowadzenie przeszukiwania katalogu poleceniem find.
+2. Biblioteka ładowana dynamicznie działa najwolniej - czasy wszystkich operacji są w jej przypadku największe.
+3. Nie ma znaczącej różnicy pomiędzy czasami wykonania przy użyciu bilblioteki statycznej a współdzielonej. Są one praktycznie jednakowe.
+4. Czasy użytkownika w każdym z przypadków są zbyt małe aby móc je zmierzyć z dobrą dokładnością.

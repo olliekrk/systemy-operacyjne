@@ -1,0 +1,15 @@
+/home/olliekrk/SysopyProjects/KrolikOlgierd/cw02/zad2                                               	dir       	4096      	19-03-2019 22:19:58 	19-03-2019 22:19:58 
+/home/olliekrk/SysopyProjects/KrolikOlgierd/cw02/zad2/dir_results.txt                               	file      	0         	19-03-2019 22:19:44 	19-03-2019 22:19:58 
+/home/olliekrk/SysopyProjects/KrolikOlgierd/cw02/zad2/example_dir                                   	dir       	4096      	19-03-2019 22:19:58 	19-03-2019 22:19:58 
+/home/olliekrk/SysopyProjects/KrolikOlgierd/cw02/zad2/example_dir/home                              	slink     	5         	19-03-2019 22:19:58 	19-03-2019 22:19:58 
+/home/olliekrk/SysopyProjects/KrolikOlgierd/cw02/zad2/example_dir/example_file                      	file      	0         	19-03-2019 22:19:58 	19-03-2019 22:19:58 
+/home/olliekrk/SysopyProjects/KrolikOlgierd/cw02/zad2/example_dir/other_dir                         	dir       	4096      	19-03-2019 22:19:58 	19-03-2019 22:19:58 
+/home/olliekrk/SysopyProjects/KrolikOlgierd/cw02/zad2/example_dir/other_dir/another_dir             	dir       	4096      	19-03-2019 22:19:58 	19-03-2019 22:19:58 
+/home/olliekrk/SysopyProjects/KrolikOlgierd/cw02/zad2/example_dir/other_dir/another_dir/another_file	file      	0         	19-03-2019 22:19:58 	19-03-2019 22:19:58 
+/home/olliekrk/SysopyProjects/KrolikOlgierd/cw02/zad2/example_dir/other_dir/lib                     	slink     	8         	19-03-2019 22:19:58 	19-03-2019 22:19:58 
+/home/olliekrk/SysopyProjects/KrolikOlgierd/cw02/zad2/example_dir/other_dir/other_file              	file      	0         	19-03-2019 22:19:58 	19-03-2019 22:19:58 
+/home/olliekrk/SysopyProjects/KrolikOlgierd/cw02/zad2/nftw_results.txt                              	file      	0         	19-03-2019 22:19:11 	19-03-2019 22:19:43 
+/home/olliekrk/SysopyProjects/KrolikOlgierd/cw02/zad2/program                                       	file      	13768     	19-03-2019 22:19:58 	19-03-2019 22:19:58 
+/home/olliekrk/SysopyProjects/KrolikOlgierd/cw02/zad2/Makefile                                      	file      	685       	19-03-2019 22:19:57 	19-03-2019 22:19:57 
+/home/olliekrk/SysopyProjects/KrolikOlgierd/cw02/zad2/program.o                                     	file      	7696      	19-03-2019 22:19:58 	19-03-2019 22:19:58 
+/home/olliekrk/SysopyProjects/KrolikOlgierd/cw02/zad2/program.c                                     	file      	4847      	19-03-2019 22:19:09 	19-03-2019 22:19:08 

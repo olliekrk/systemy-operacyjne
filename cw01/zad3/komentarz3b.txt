@@ -1,0 +1,7 @@
+1. Optymalizacja na różnych poziomach wprowadziła niewiele zmian widocznych podczas wykonywania się programu.
+Czasy wykonania poszczególnych operacji nie zmieniły się znacząco, +-0.1 sek.
+2. Podobnie jak w 3a, program z biblioteką DLL działał najwolniej, a programy z bibliotekami statystycznymi i współdzielonymi wypadły podobnie czasowo.
+3. Programy z biblioteką statyczną zajmują na dysku najwięcej miejsca, niezależnie od flagi optymalizacji.
+4. Programy z bibliotekami DLL zajmują na dysku najmniej miejsca, nieco więcej zajmują te z bibliotekami współdzielonymi.
+5. W przypadku bibliotek DLL i współdzielonych rozmiar programu na dysku jest odpowiednio największy dla flagi Os, a najmniejszy dla flagi O2.
+Jednakże różnice te w przypadku naszego programu są wręcz znikome.
